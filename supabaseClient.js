@@ -1,0 +1,1 @@
+// Relocated to src/lib/supabaseClient.js as per Step 4
