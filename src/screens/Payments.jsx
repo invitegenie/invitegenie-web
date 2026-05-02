@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import Layout from "../components/Layout";
 import PageTitle from "../components/PageTitle";
 
@@ -52,7 +52,7 @@ export default function Payments() {
               />
               <div>
                 <p className="font-bold text-white">Credit Card</p>
-                <p className="text-sm text-slate-400">•••• •••• •••• 4242</p>
+                <p className="text-sm text-slate-400">â€¢â€¢â€¢â€¢ â€¢â€¢â€¢â€¢ â€¢â€¢â€¢â€¢ 4242</p>
               </div>
             </label>
             <label className="flex items-center p-4 border border-white/10 rounded-xl hover:bg-white/5 cursor-pointer transition-colors">

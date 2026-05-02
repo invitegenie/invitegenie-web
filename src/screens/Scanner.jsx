@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+﻿import { useState, useMemo, useEffect } from "react";
 import Layout from "../components/Layout";
 import * as Engine from "../auth/coreEngine";
 import { KEYS } from "../auth/coreEngine";
@@ -54,7 +54,7 @@ export default function Scanner() {
         <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
              <h1 className="text-3xl font-black text-white tracking-tighter">STAFF AGENT SCANNER</h1>
-             <p className="text-gray-500 text-xs mt-1 uppercase font-bold tracking-[0.2em]">Validate Access • {recentCheckins.length} Recent Scans</p>
+             <p className="text-gray-500 text-xs mt-1 uppercase font-bold tracking-[0.2em]">Validate Access â€¢ {recentCheckins.length} Recent Scans</p>
           </div>
           <div className="flex gap-2">
             <button className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-white transition-all">Select Event</button>

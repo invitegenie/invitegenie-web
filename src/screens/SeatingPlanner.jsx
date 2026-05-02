@@ -1,23 +1,23 @@
-import { useState, useEffect, useMemo } from "react";
+﻿import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import * as Engine from "../auth/coreEngine";
-import { useAuth } from "../auth/AuthContext";
 
 export default function SeatingPlanner() {
   const { eventId } = useParams();
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
   
   const [event, setEvent] = useState(null);
   const [map, setMap] = useState(null);
   const [guests, setGuests] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
-
   useEffect(() => {
-    const loadData = () => {
-      const currentEvent = Engine.getEventById(eventId);
+    let mounted = true;
+
+    const loadData = async () => {
+      const currentEvent = await Engine.getEventById(eventId);
+      if (!mounted) return;
       if (!currentEvent) {
         navigate("/dashboard");
         return;
@@ -42,6 +42,9 @@ export default function SeatingPlanner() {
     };
 
     loadData();
+    return () => {
+      mounted = false;
+    };
   }, [eventId, navigate]);
 
   // Filter guests who haven't been assigned a seat yet
@@ -85,7 +88,7 @@ export default function SeatingPlanner() {
           <div>
             <h1 className="text-2xl font-black text-white uppercase tracking-tighter">Seating Architect</h1>
             <p className="text-[10px] text-violet-400 uppercase font-black tracking-[0.2em] mt-1">
-              {event.title} • {unassignedGuests.length} Guests Unplaced
+              {event.title} â€¢ {unassignedGuests.length} Guests Unplaced
             </p>
           </div>
           <div className="flex gap-3">

@@ -1,6 +1,7 @@
-import { useState, useMemo } from "react";
+﻿import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
+import { useSearch } from "../contexts/SearchContext";
 
 // Local Helper (Fallback if services/helpers not fully implemented for FCFA)
 const formatFCFA = (amount) => {
@@ -235,14 +236,14 @@ const KPICard = ({ label, value, subtitle, icon, color }) => (
 // Main Invoices Component
 export default function Invoices() {
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState("");
+  const { searchQuery, setSearchQuery } = useSearch();
   const [statusFilter, setStatusFilter] = useState("All");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [invoices, setInvoices] = useState([
     {
       id: "INV-CMR-2029-0012",
       client: "Ngalle Marie",
-      city: "Yaoundé",
+      city: "YaoundÃ©",
       email: "marie.ngalle@email.cm",
       phone: "+237 670 123 456",
       date: "Apr 20, 2026",
@@ -258,7 +259,7 @@ export default function Invoices() {
         { category: "Standard Entry", price: 10000, qty: 3, amount: 30000 },
         { category: "Premium Catering", price: 20000, qty: 1, amount: 20000 },
       ],
-      notes: "Payment received. Thank you for your business! Venue: Yaoundé Leadership Summit.",
+      notes: "Payment received. Thank you for your business! Venue: YaoundÃ© Leadership Summit.",
     },
     {
       id: "INV-CMR-2029-0013",
@@ -329,12 +330,13 @@ export default function Invoices() {
 
   const filteredInvoices = useMemo(() => {
     return invoices.filter((inv) => {
-      const matchesSearch = inv.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            inv.client.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = inv.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            inv.client.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            inv.city.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesFilter = statusFilter === "All" || inv.status === statusFilter.toLowerCase();
       return matchesSearch && matchesFilter;
     });
-  }, [invoices, searchTerm, statusFilter]);
+  }, [invoices, searchQuery, statusFilter]);
 
   const stats = {
     paid: invoices.filter((i) => i.status === "paid").reduce((sum, i) => sum + i.amount, 0),
@@ -422,7 +424,7 @@ export default function Invoices() {
 
               <div className="relative mb-6">
                 <span className="material-symbols-outlined absolute left-3 top-2.5 text-gray-500 text-sm">search</span>
-                <input type="text" placeholder="Search invoices..." className="w-full bg-white/[0.03] border border-white/5 rounded-xl pl-9 pr-4 py-2.5 text-xs text-gray-300 outline-none" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                <input type="text" placeholder="Search invoices..." className="w-full bg-white/[0.03] border border-white/5 rounded-xl pl-9 pr-4 py-2.5 text-xs text-gray-300 outline-none" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
               </div>
 
               <div className="flex gap-2 overflow-x-auto no-scrollbar mb-6 pb-1">

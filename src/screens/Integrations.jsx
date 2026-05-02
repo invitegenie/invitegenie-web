@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import Layout from "../components/Layout";
 import PageTitle from "../components/PageTitle";
 
@@ -7,28 +7,28 @@ const availableIntegrations = [
     id: 1,
     name: "Slack",
     description: "Get event notifications in Slack",
-    icon: "🔔",
+    icon: "ðŸ””",
     connected: false,
   },
   {
     id: 2,
     name: "Google Calendar",
     description: "Sync events with Google Calendar",
-    icon: "📅",
+    icon: "ðŸ“…",
     connected: true,
   },
   {
     id: 3,
     name: "Mailchimp",
     description: "Email marketing integration",
-    icon: "📧",
+    icon: "ðŸ“§",
     connected: false,
   },
   {
     id: 4,
     name: "Zapier",
     description: "Automate workflows",
-    icon: "⚙️",
+    icon: "âš™ï¸",
     connected: false,
   },
 ];

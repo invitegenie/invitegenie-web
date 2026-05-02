@@ -1,8 +1,11 @@
-import { useState, useMemo } from "react";
+﻿import { useState, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import Layout from "../components/Layout";
+import { useSearch } from "../contexts/SearchContext";
+import { KEYS } from "../auth/coreEngine";
+import useEngineCollection from "./useEngineCollection";
 
-const MOCK_BOOKINGS = [
+export const MOCK_BOOKINGS = [
   { id: "INV10011", date: "2029/02/15 10:30 AM", name: "Jackson Moore", event: "Symphony Under the Stars", category: "Diamond", price: 50000, qty: 2, amount: 100000, status: "Confirmed", voucher: "123456-MUSIC" },
   { id: "INV10012", date: "2029/02/16 03:45 PM", name: "Alicia Smithson", event: "Runway Revolution 2024", category: "Platinum", price: 120000, qty: 1, amount: 120000, status: "Pending", voucher: "-" },
   { id: "INV10013", date: "2029/02/17 01:15 PM", name: "Natalie Johnson", event: "Global Wellness Summit", category: "CAT 1", price: 80000, qty: 3, amount: 240000, status: "Confirmed", voucher: "789101-WELLNESS" },
@@ -15,35 +18,61 @@ const MOCK_BOOKINGS = [
 
 export default function Bookings() {
   const navigate = useNavigate();
-  const [search, setSearch] = useState("");
+  const { searchQuery, setSearchQuery } = useSearch();
+  const engineTickets = useEngineCollection(KEYS.TICKETS);
   const [statusFilter, setStatusFilter] = useState("All");
   const [categoryFilter, setCategoryFilter] = useState("All Category");
-  const [selectedId, setSelectedId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [timeFilter, setTimeFilter] = useState("This Month");
 
+  const bookingData = useMemo(() => {
+    const normalizedTickets = engineTickets.map((ticket) => ({
+      id: ticket.id,
+      date: formatDate(ticket.createdAt || ticket.date),
+      name: ticket.buyerName || "Guest",
+      event: ticket.eventName || "Invite Genie Event",
+      category: ticket.type || ticket.ticketType || "Standard",
+      price: Number(ticket.unitPrice || ticket.price || ticket.amount || 0) / Math.max(Number(ticket.quantity || 1), 1),
+      qty: Number(ticket.quantity || 1),
+      amount: Number(ticket.amount || ticket.price || 0),
+      status: normalizeStatus(ticket.status),
+      voucher: ticket.id,
+      eventId: ticket.eventId,
+      source: "engine",
+    }));
+
+    const seenIds = new Set(normalizedTickets.map((ticket) => String(ticket.id)));
+    const mockRows = MOCK_BOOKINGS.filter((booking) => !seenIds.has(String(booking.id))).map((booking) => ({
+      ...booking,
+      source: "mock",
+    }));
+
+    return [...normalizedTickets, ...mockRows];
+  }, [engineTickets]);
+
   const filteredData = useMemo(() => {
-    return MOCK_BOOKINGS.filter((item) => {
+    return bookingData.filter((item) => {
       const matchesSearch = 
-        item.name.toLowerCase().includes(search.toLowerCase()) ||
-        item.event.toLowerCase().includes(search.toLowerCase()) ||
-        item.id.toLowerCase().includes(search.toLowerCase());
+        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.event.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.id.toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesStatus = statusFilter === "All" || item.status === statusFilter;
       const matchesCategory = categoryFilter === "All Category" || item.category === categoryFilter;
 
       return matchesSearch && matchesStatus && matchesCategory;
     });
-  }, [search, statusFilter, categoryFilter]);
+  }, [bookingData, searchQuery, statusFilter, categoryFilter]);
 
-  const handleVoucherClick = (voucher) => {
-    if (voucher === "-") return;
-    alert(`E-Voucher ${voucher} is valid.\nStatus: Ready for Check-in at Scanner.`);
-    navigate("/scanner");
+  const handleVoucherClick = (event, row) => {
+    event.stopPropagation();
+    if (row.voucher === "-") return;
+    navigate(`/bookings/${row.id}/voucher`);
   };
 
   return (
-    <div className="max-w-[1440px] mx-auto space-y-6 pb-20 font-sans animate-in fade-in duration-500">
+    <Layout>
+      <div className="max-w-[1440px] mx-auto space-y-6 pb-20 font-sans animate-in fade-in duration-500">
       {/* 1. Top Header */}
       <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
@@ -64,8 +93,8 @@ export default function Bookings() {
               type="text"
               placeholder="Search..."
               className="w-full bg-white/[0.03] border border-white/5 rounded-lg pl-9 pr-4 py-2 text-xs text-gray-300 outline-none focus:ring-1 focus:ring-violet-500/30 transition-all"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
           <div className="flex items-center gap-1.5">
@@ -90,19 +119,19 @@ export default function Bookings() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard 
           label="Total Bookings" 
-          value="55,000" 
+          value={bookingData.length.toLocaleString()} 
           icon="confirmation_number" 
           onClick={() => { setStatusFilter("All"); setCategoryFilter("All Category"); }} 
         />
         <StatCard 
           label="Total Tickets Sold" 
-          value="45,000" 
+          value={bookingData.reduce((sum, row) => sum + Number(row.qty || 0), 0).toLocaleString()} 
           icon="local_activity" 
           onClick={() => setStatusFilter("Confirmed")} 
         />
         <StatCard 
           label="Total Earnings" 
-          value="FCFA 275,450,000" 
+          value={`FCFA ${bookingData.reduce((sum, row) => sum + Number(row.amount || 0), 0).toLocaleString()}`} 
           icon="account_balance_wallet" 
           highlight 
           onClick={() => navigate("/financials")} 
@@ -181,16 +210,16 @@ export default function Bookings() {
               {filteredData.map((row) => (
                 <tr
                   key={row.id}
-                  onClick={() => navigate(`/bookings/${row.id}/voucher`)}
+                  onClick={() => navigate(`/bookings/${row.id}`)}
                   className={`text-[11px] transition-colors cursor-pointer hover:bg-white/[0.01]`}
                 >
                   <td className="px-6 py-4 font-bold text-gray-600">{row.id}</td>
                   <td className="px-6 py-4 text-gray-500 whitespace-nowrap">{row.date}</td>
                   <td className="px-6 py-4 font-semibold text-gray-200">
-                    <button onClick={() => navigate("/profile")} className="hover:text-violet-400 transition-colors">{row.name}</button>
+                    <button onClick={(event) => { event.stopPropagation(); navigate("/profile"); }} className="hover:text-violet-400 transition-colors">{row.name}</button>
                   </td>
                   <td className="px-6 py-4 text-gray-400 truncate max-w-[150px]">
-                    <button onClick={() => navigate("/events")} className="hover:text-violet-400 transition-colors">{row.event}</button>
+                    <button onClick={(event) => { event.stopPropagation(); navigate(row.eventId ? `/events/${row.eventId}` : "/events"); }} className="hover:text-violet-400 transition-colors">{row.event}</button>
                   </td>
                   <td className="px-6 py-4">
                     <span className="px-2 py-0.5 rounded bg-white/5 text-gray-400 border border-white/5 text-[9px] uppercase font-bold">{row.category}</span>
@@ -208,7 +237,7 @@ export default function Bookings() {
                   </td>
                   <td className="px-6 py-4 font-mono text-[10px]">
                     <button 
-                      onClick={() => handleVoucherClick(row.voucher)}
+                      onClick={(event) => handleVoucherClick(event, row)}
                       className={`${row.voucher !== '-' ? 'text-violet-400 hover:underline' : 'text-gray-600'}`}
                     >
                       {row.voucher}
@@ -222,7 +251,7 @@ export default function Bookings() {
 
         {/* Pagination */}
         <div className="p-4 bg-white/[0.01] border-t border-white/5 flex items-center justify-between">
-          <p className="text-[10px] text-gray-500 font-bold">Showing {filteredData.length} of {MOCK_BOOKINGS.length} bookings</p>
+          <p className="text-[10px] text-gray-500 font-bold">Showing {filteredData.length} of {bookingData.length} bookings</p>
           <div className="flex items-center gap-1">
             {[1, 2, 3].map((num) => (
               <button
@@ -241,7 +270,8 @@ export default function Bookings() {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </Layout>
   );
 }
 
@@ -356,4 +386,25 @@ function CategoryCard({ onCategorySelect }) {
       </div>
     </div>
   );
+}
+
+function normalizeStatus(status) {
+  const value = String(status || "confirmed").toLowerCase();
+  if (value === "valid" || value === "paid") return "Confirmed";
+  if (value === "pending") return "Pending";
+  if (value === "cancelled" || value === "canceled") return "Cancelled";
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function formatDate(value) {
+  if (!value) return new Date().toLocaleString();
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString("en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }

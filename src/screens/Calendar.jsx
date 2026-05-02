@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+﻿import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import { getEvents } from "../services/mockData";
@@ -309,7 +309,7 @@ function CalendarGrid({ viewDate, calendarDays, selectedDate, setSelectedDate, s
             const dayAgendas = filteredAgendas.filter(a => a.date === dateStr);
             const isSelected = selectedDate === dateStr;
             return (
-              <div key={idx} onClick={() => day && setSelectedDate(dateStr)} className={`min-h-[100px] border-r border-b border-white/[0.05] p-2 transition-colors cursor-pointer ${day ? (isSelected ? 'bg-white/[0.04]' : 'hover:bg-white/[0.02]') : 'bg-transparent'}`}>
+              <div key={`day-${idx}`} onClick={() => day && setSelectedDate(dateStr)} className={`min-h-[100px] border-r border-b border-white/[0.05] p-2 transition-colors cursor-pointer ${day ? (isSelected ? 'bg-white/[0.04]' : 'hover:bg-white/[0.02]') : 'bg-transparent'}`}>
                 {day && (
                   <>
                     <span className={`text-xs font-semibold ${isSelected ? 'text-violet-400' : 'text-slate-500'}`}>{day}</span>
@@ -379,7 +379,7 @@ function FeedbackModule() {
     <div className="space-y-4">
       <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-yellow-400">★★★★★</span>
+          <span className="text-yellow-400">â˜…â˜…â˜…â˜…â˜…</span>
           <span className="text-xs text-slate-400">by Tunde A.</span>
         </div>
         <p className="text-sm text-slate-300">"The traditional wedding coordination was flawless! The stage for the live band was perfect."</p>

@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "invitegenie-app"
-  }
+    "default": "invitegenie-702f8"
+  },
+  "targets": {},
+  "etags": {}
 }

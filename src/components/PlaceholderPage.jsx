@@ -29,7 +29,7 @@ export default function PlaceholderPage({ title, description, icon, backLink, ac
 
           {actions && actions.map((action, idx) => (
             <button
-              key={idx}
+              key={`action-${idx}`}
               onClick={() => action.onClick ? action.onClick() : navigate(action.path)}
               className={`px-6 py-2.5 rounded-lg font-medium transition-all ${
                 action.primary

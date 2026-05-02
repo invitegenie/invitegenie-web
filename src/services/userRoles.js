@@ -1,130 +1,112 @@
+/**
+ * Canonical User Roles for InviteGenie - The Foundation Layer.
+ */
 export const USER_ROLES = {
-  PUBLIC_GUEST: "public_guest",
-  EVENT_HOST: "event_host",
-  VENDOR_BASIC: "vendor_basic",
-  VENDOR_PRO: "vendor_pro",
-  STAFF: "staff",
+  NORMAL_USER: "normal_user",
+  PRO_USER: "pro_user",
+  VENDOR: "vendor",
+  EVENT_PLANNER: "event_planner",
+  ENTERPRISE_CLIENT: "enterprise_client",
+  TASKER: "tasker",
+  CHECKIN_AGENT: "checkin_agent",
   FINANCE_ADMIN: "finance_admin",
   APP_ADMIN: "app_admin",
   SUPER_ADMIN: "super_admin",
+
+  PUBLIC_GUEST: "normal_user",
+  BASIC_USER: "normal_user",
+  EVENT_HOST: "event_planner",
+  VENDOR_BASIC: "vendor",
+  VENDOR_PRO: "vendor",
+  TASKER_FREELANCER: "tasker",
+  STAFF: "checkin_agent",
+  STAFF_AGENT: "checkin_agent",
+  CHECK_IN_AGENT: "checkin_agent",
+  CHECKIN_ADMIN: "app_admin",
+  ADMIN: "app_admin",
+  SUPPORT_ADMIN: "app_admin",
+  MARKETPLACE_ADMIN: "app_admin",
+  CONTENT_MODERATOR: "app_admin",
 };
 
-export const ROLE_PERMISSIONS = {
-  [USER_ROLES.PUBLIC_GUEST]: [
-    "browse_events",
-    "buy_tickets",
-    "view_own_vouchers",
-    "post_memories",
-    "interact_memories",
-    "manage_own_profile",
-  ],
-  [USER_ROLES.EVENT_HOST]: [
-    "browse_events",
-    "buy_tickets",
-    "create_events",
-    "manage_own_events",
-    "manage_guest_list",
-    "send_invitations",
-    "view_event_analytics",
-    "view_own_bookings",
-    "generate_vouchers",
-  ],
-  [USER_ROLES.VENDOR_BASIC]: [
-    "browse_events",
-    "create_vendor_profile",
-    "list_services",
-    "receive_bookings",
-    "view_limited_sales",
-    "manage_own_listings",
-  ],
-  [USER_ROLES.VENDOR_PRO]: [
-    "browse_events",
-    "create_vendor_profile",
-    "list_services",
-    "receive_bookings",
-    "manage_own_listings",
-    "featured_listings",
-    "advanced_analytics",
-    "promotions",
-    "custom_branding",
-    "priority_visibility",
-    "export_reports",
-  ],
-  [USER_ROLES.STAFF]: [
-    "browse_events",
-    "scan_qr",
-    "validate_vouchers",
-    "check_in_guests",
-  ],
-  [USER_ROLES.FINANCE_ADMIN]: [
-    "browse_events",
-    "view_bookings",
-    "view_invoices",
-    "view_payments",
-    "manage_invoices",
-    "manage_refunds",
-  ],
-  [USER_ROLES.APP_ADMIN]: [
-    "browse_events",
-    "manage_users",
-    "manage_all_events",
-    "moderate_feed",
-    "resolve_support",
-    "view_platform_analytics",
-    "moderate_content",
-  ],
-  [USER_ROLES.SUPER_ADMIN]: [
-    "browse_events",
-    "manage_users",
-    "manage_all_events",
-    "moderate_feed",
-    "resolve_support",
-    "view_platform_analytics",
-    "moderate_content",
-    "manage_admins",
-    "configure_pricing",
-    "manage_all_vendors",
-    "view_all_financials",
-    "platform_settings",
-    "delete_records",
-  ],
+export const NORMAL_USER_ROLES = [
+  USER_ROLES.NORMAL_USER,
+  USER_ROLES.PRO_USER,
+  USER_ROLES.VENDOR,
+  USER_ROLES.EVENT_PLANNER,
+  USER_ROLES.ENTERPRISE_CLIENT,
+  USER_ROLES.TASKER,
+  USER_ROLES.CHECKIN_AGENT,
+];
+
+export const ADMIN_ROLES = [
+  USER_ROLES.FINANCE_ADMIN,
+  USER_ROLES.APP_ADMIN,
+  USER_ROLES.SUPER_ADMIN,
+];
+
+export const ADMIN_LOGIN_ROLES = ADMIN_ROLES;
+
+const LEGACY_ROLE_MAP = {
+  PUBLIC_GUEST: USER_ROLES.NORMAL_USER,
+  BASIC_USER: USER_ROLES.NORMAL_USER,
+  BASIC: USER_ROLES.NORMAL_USER,
+  NORMAL_USER: USER_ROLES.NORMAL_USER,
+  PRO_USER: USER_ROLES.PRO_USER,
+  EVENT_HOST: USER_ROLES.EVENT_PLANNER,
+  HOST: USER_ROLES.EVENT_PLANNER,
+  EVENT_PLANNER: USER_ROLES.EVENT_PLANNER,
+  ENTERPRISE_CLIENT: USER_ROLES.ENTERPRISE_CLIENT,
+  VENDOR_BASIC: USER_ROLES.VENDOR,
+  VENDOR_PRO: USER_ROLES.VENDOR,
+  VENDOR: USER_ROLES.VENDOR,
+  TASKER_FREELANCER: USER_ROLES.TASKER,
+  TASKER: USER_ROLES.TASKER,
+  STAFF: USER_ROLES.CHECKIN_AGENT,
+  STAFF_AGENT: USER_ROLES.CHECKIN_AGENT,
+  CHECK_IN_AGENT: USER_ROLES.CHECKIN_AGENT,
+  CHECKIN_AGENT: USER_ROLES.CHECKIN_AGENT,
+  CHECKIN_ADMIN: USER_ROLES.APP_ADMIN,
+  CHECK_IN_ADMIN: USER_ROLES.APP_ADMIN,
+  FINANCE_ADMIN: USER_ROLES.FINANCE_ADMIN,
+  SUPPORT_ADMIN: USER_ROLES.APP_ADMIN,
+  MARKETPLACE_ADMIN: USER_ROLES.APP_ADMIN,
+  CONTENT_MODERATOR: USER_ROLES.APP_ADMIN,
+  APP_ADMIN: USER_ROLES.APP_ADMIN,
+  ADMIN: USER_ROLES.APP_ADMIN,
+  SUPER_ADMIN: USER_ROLES.SUPER_ADMIN,
 };
 
-/**
- * Check if a role has a specific permission
- * @param {string} role 
- * @param {string} permission 
- * @returns {boolean}
- */
-export const hasPermission = (role, permission) => {
-  if (!role || !ROLE_PERMISSIONS[role]) return false;
-  return ROLE_PERMISSIONS[role].includes(permission);
+const LEGACY_VALUE_MAP = {
+  basic_user: USER_ROLES.NORMAL_USER,
+  event_host: USER_ROLES.EVENT_PLANNER,
+  vendor_basic: USER_ROLES.VENDOR,
+  vendor_pro: USER_ROLES.VENDOR,
+  tasker_freelancer: USER_ROLES.TASKER,
+  staff: USER_ROLES.CHECKIN_AGENT,
+  staff_agent: USER_ROLES.CHECKIN_AGENT,
+  check_in_agent: USER_ROLES.CHECKIN_AGENT,
+  checkin_admin: USER_ROLES.APP_ADMIN,
+  support_admin: USER_ROLES.APP_ADMIN,
+  marketplace_admin: USER_ROLES.APP_ADMIN,
+  content_moderator: USER_ROLES.APP_ADMIN,
+  admin: USER_ROLES.APP_ADMIN,
 };
 
-/**
- * Mock current user getter for demo purposes
- * Change this value to test different UI states
- */
-export const getCurrentUserRole = () => {
-  const user = JSON.parse(localStorage.getItem("invitegenie_user"));
-  return user?.role || null;
-};
+export function normalizeRole(role) {
+  if (!role) return USER_ROLES.NORMAL_USER;
+  const raw = String(role).trim();
+  if (Object.values(USER_ROLES).includes(raw)) return raw;
+  if (LEGACY_VALUE_MAP[raw]) return LEGACY_VALUE_MAP[raw];
+  return LEGACY_ROLE_MAP[raw.toUpperCase()] || raw.toLowerCase();
+}
 
-/**
- * Mock login function
- */
-export const loginUser = (role) => {
-  const mockUser = {
-    id: `user_${role}`,
-    name: `${role.replace('_', ' ').toUpperCase()} User`,
-    role: role,
-    avatar: role[0].toUpperCase()
-  };
-  localStorage.setItem("invitegenie_user", JSON.stringify(mockUser));
-  window.location.href = "/dashboard";
-};
+export function isAdminRole(role) {
+  const normalized = normalizeRole(role);
+  return ADMIN_ROLES.includes(normalized);
+}
 
-export const logoutUser = () => {
-  localStorage.removeItem("invitegenie_user");
-  window.location.href = "/";
-};
+export function isNormalUserRole(role) {
+  const normalized = normalizeRole(role);
+  return NORMAL_USER_ROLES.includes(normalized);
+}

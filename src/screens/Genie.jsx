@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+﻿import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import { getGenieResponse } from "../services/aiAssistantService";
@@ -26,7 +26,7 @@ export default function Genie() {
   const [messages, setMessages] = useState([
     {
       id: 1,
-      text: "Hello! I'm the Genie of Invite Genie! 🧞 I can help you:\n• Create event descriptions and ideas\n• Write invitation text\n• Suggest themes and layouts\n• Improve your event details\n\nWhat would you like help with today?",
+      text: "Hello! I'm the Genie of Invite Genie! ðŸ§ž I can help you:\nâ€¢ Create event descriptions and ideas\nâ€¢ Write invitation text\nâ€¢ Suggest themes and layouts\nâ€¢ Improve your event details\n\nWhat would you like help with today?",
       sender: "genie",
       timestamp: new Date(),
     },
@@ -160,7 +160,7 @@ export default function Genie() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 {QUICK_PROMPTS.map((prompt, idx) => (
                   <button
-                    key={idx}
+                    key={`prompt-${idx}-${prompt.text}`}
                     onClick={() => handleQuickPrompt(prompt.prompt)}
                     className="p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-all text-left group"
                   >

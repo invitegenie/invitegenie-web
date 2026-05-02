@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+﻿import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 
 function Icon({ name, className = "" }) {
@@ -18,18 +18,18 @@ export default function Meetings() {
   const meetings = [
     {
       title: "Seating Plan Approval Meeting",
-      time: "10:00 AM – 10:30 AM",
-      contact: "Venue Coordinator – Sophia Reynolds",
+      time: "10:00 AM â€“ 10:30 AM",
+      contact: "Venue Coordinator â€“ Sophia Reynolds",
     },
     {
       title: "Initial Planning Call for Brann's Birthday Party",
-      time: "10:45 AM – 11:15 AM",
-      contact: "Client – Brann Callahan",
+      time: "10:45 AM â€“ 11:15 AM",
+      contact: "Client â€“ Brann Callahan",
     },
     {
       title: "Vendor Final Walkthrough",
-      time: "2:00 PM – 3:00 PM",
-      contact: "DJ & Catering – Michael Torres",
+      time: "2:00 PM â€“ 3:00 PM",
+      contact: "DJ & Catering â€“ Michael Torres",
     },
   ];
 
@@ -49,7 +49,7 @@ export default function Meetings() {
         <div className="space-y-4">
           {meetings.map((meeting, idx) => (
             <div
-              key={idx}
+              key={`meeting-${idx}`}
               className="rounded-2xl border border-white/10 bg-slate-950/70 p-5 backdrop-blur-xl"
             >
               <h3 className="font-bold text-white">{meeting.title}</h3>

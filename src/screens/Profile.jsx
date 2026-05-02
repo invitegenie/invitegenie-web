@@ -1,7 +1,11 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+﻿import { useState, useEffect, useCallback, useRef } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext";
+import { supabase } from "../lib/supabaseClient";
 import { getUserProfile } from "../services/mockData";
+import { canCreateMarketplaceListing } from "../services/roles";
 import Icon from "../components/Icon";
+import { useSearch } from "../contexts/SearchContext";
 
 function SectionTitle({ children }) {
   return (
@@ -10,7 +14,7 @@ function SectionTitle({ children }) {
         {children}
       </h2>
       <div className="hidden h-px flex-1 bg-gradient-to-r from-yellow-500/50 via-yellow-500/20 to-transparent sm:block" />
-      <span className="hidden text-yellow-400 sm:block">✧</span>
+      <span className="hidden text-yellow-400 sm:block">âœ§</span>
     </div>
   );
 }
@@ -126,7 +130,7 @@ function DesktopSidebar() {
   ];
 
   return (
-    <aside className="hidden min-w-0 rounded-3xl border border-white/[0.04] bg-[#141218]/80 p-4 shadow-md backdrop-blur-2xl xl:sticky xl:top-4 xl:flex xl:h-[calc(100vh-2rem)] xl:flex-col xl:overflow-y-auto">
+    <aside className="hidden min-w-0 rounded-3xl border border-white/[0.04] bg-[#141218]/80 p-4 shadow-md backdrop-blur-2xl lg:sticky lg:top-4 lg:flex lg:h-[calc(100vh-2rem)] lg:flex-col lg:overflow-y-auto">
       <div className="mb-6 flex items-center gap-3 px-2">
         <div className="h-9 w-9 rounded-full bg-gradient-to-tr from-violet-500 to-indigo-400 shadow-sm" />
         <h2 className="text-xl font-semibold font-heading">InviteGenie</h2>
@@ -198,7 +202,7 @@ function DesktopSidebar() {
 
         <p className="px-3 pt-6 text-xs text-slate-500">
           InviteGenie v1.0.0
-          <br />© 2025 All rights reserved
+          <br />Â© 2025 All rights reserved
         </p>
       </div>
     </aside>
@@ -207,7 +211,7 @@ function DesktopSidebar() {
 
 function MobileHero({ name, email, tier, eventsHosted, totalGuests, points }) {
   return (
-    <section className="relative overflow-hidden rounded-3xl border border-yellow-500/30 bg-slate-950/80 p-5 shadow-2xl backdrop-blur-2xl sm:p-7 xl:hidden">
+    <section className="relative overflow-hidden rounded-3xl border border-yellow-500/30 bg-slate-950/80 p-5 shadow-2xl backdrop-blur-2xl sm:p-7 lg:hidden">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(126,34,206,0.35),transparent_36%),radial-gradient(circle_at_top_right,rgba(34,197,94,0.16),transparent_30%)]" />
       <div className="absolute right-0 top-0 h-40 w-72 rounded-bl-full bg-purple-900/30 blur-2xl" />
       <div className="absolute right-0 top-0 hidden h-full w-1/2 opacity-50 sm:block">
@@ -256,18 +260,48 @@ function MobileHero({ name, email, tier, eventsHosted, totalGuests, points }) {
   );
 }
 
-function DesktopHeader({ name, tier }) {
+function ProfileDropdown({ isOpen, onClose, user }) {
+  const navigate = useNavigate();
+  if (!isOpen) return null;
+  return (
+    <div className="absolute right-0 top-full mt-2 w-48 rounded-2xl border border-white/10 bg-slate-950 p-2 shadow-2xl animate-in zoom-in-95 duration-200">
+      <div className="p-3 border-b border-white/5">
+        <p className="text-xs font-bold text-white truncate">{user.name}</p>
+        <p className="text-[10px] text-slate-500 uppercase font-black">{user.tier}</p>
+      </div>
+      <button onClick={() => { navigate("/my-account"); onClose(); }} className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-white/5 rounded-xl mt-1">My Account</button>
+      <button onClick={() => { navigate("/settings"); onClose(); }} className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-white/5 rounded-xl">Settings</button>
+      <button onClick={() => { navigate("/marketplace/new"); onClose(); }} className="w-full text-left px-3 py-2 text-xs text-violet-300 hover:bg-violet-500/10 rounded-xl">Create Listing</button>
+      <button onClick={() => { localStorage.clear(); window.location.href = "/"; }} className="w-full text-left px-3 py-2 text-xs text-rose-400 hover:bg-rose-500/10 rounded-xl">Sign Out</button>
+    </div>
+  );
+}
+
+function DesktopHeader({ name, tier, showCreateListing }) {
   const navigate = useNavigate();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const { searchQuery, setSearchQuery } = useSearch();
 
   return (
-    <header className="relative z-50 hidden items-center justify-between gap-6 rounded-3xl border border-white/10 bg-slate-950/70 px-5 py-4 shadow-xl backdrop-blur-xl xl:flex">
-      <div className="flex min-w-[260px] max-w-md flex-1 items-center gap-3 rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3 text-slate-400">
-        <Icon name="search" />
-        <span className="truncate text-sm">Search events, tasks, guests...</span>
+    <header className="relative z-50 hidden items-center justify-between gap-6 rounded-3xl border border-white/10 bg-slate-950/70 px-5 py-4 shadow-xl backdrop-blur-xl lg:flex">
+      <div className="flex min-w-[260px] max-w-md flex-1 items-center gap-3 rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-1 text-slate-400">
+        <Icon name="search" className="text-sm" />
+        <input 
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search everything..."
+          className="w-full bg-transparent text-sm text-white outline-none placeholder:text-slate-500 py-2"
+        />
       </div>
 
       <div className="flex shrink-0 items-center gap-4">
+        <button 
+          onClick={() => navigate("/marketplace/new")}
+          className="rounded-2xl border border-purple-500/40 bg-purple-500/10 px-5 py-3 text-sm font-bold text-purple-100 hover:bg-purple-500/20 transition-all"
+        >
+          Create Listing
+        </button>
         <button 
           onClick={() => navigate("/events/new")}
           className="rounded-2xl bg-gradient-to-r from-purple-600 to-fuchsia-500 px-5 py-3 text-sm font-bold hover:opacity-90"
@@ -304,7 +338,7 @@ function DesktopHeader({ name, tier }) {
           <ProfileDropdown 
             isOpen={isProfileMenuOpen} 
             onClose={() => setIsProfileMenuOpen(false)} 
-            user={{ name, tier }} 
+            user={{ name, tier }}
           />
         </div>
       </div>
@@ -314,7 +348,7 @@ function DesktopHeader({ name, tier }) {
 
 function DesktopProfileStrip({ name, email, tier, eventsHosted, totalGuests, points }) {
   return (
-    <section className="hidden rounded-3xl border border-yellow-500/20 bg-slate-950/70 p-5 shadow-xl backdrop-blur-xl xl:block">
+    <section className="hidden rounded-3xl border border-yellow-500/20 bg-slate-950/70 p-5 shadow-xl backdrop-blur-xl lg:block">
       <div className="flex flex-col gap-5 2xl:flex-row 2xl:items-center 2xl:justify-between">
         <div className="flex items-center gap-4">
           <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-purple-600 to-emerald-400 text-2xl font-bold">
@@ -374,25 +408,141 @@ function UpgradeBanner() {
   );
 }
 
-function TaskPanelContent() {
+function TaskPanelContent({ onTaskUpdated }) {
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [pendingRemoval, setPendingRemoval] = useState({}); // { taskId: taskObject }
+  const timeoutRefs = useRef({}); // { taskId: timeoutId }
+
+  const fetchTasks = useCallback(async () => {
+    if (!currentUser) return;
+    try {
+      const { data, error } = await supabase
+        .from("tasks")
+        .select("*")
+        .eq("user_id", currentUser.id)
+        .eq("completed", false)
+        .order("created_at", { ascending: false })
+        .limit(3);
+
+      if (error) throw error;
+      setTasks(data || []);
+    } catch (err) {
+      console.error("Error fetching tasks:", err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    fetchTasks();
+    // Cleanup timeouts on unmount
+    return () => {
+      for (const taskId in timeoutRefs.current) {
+        clearTimeout(timeoutRefs.current[taskId]);
+      }
+    };
+  }, [currentUser]);
+
+  const handleToggleComplete = async (task) => {
+    const taskId = task.id;
+    try {
+      const { error } = await supabase
+        .from("tasks")
+        .update({ completed: true })
+        .eq("id", taskId);
+
+      if (error) throw error;
+      
+      // Optimistically remove from UI
+      setTasks(prev => prev.filter(t => t.id !== taskId));
+
+      // Add to pending removal with a timeout
+      const timeoutId = setTimeout(async () => {
+        try {
+          const { error: permanentUpdateError } = await supabase
+            .from("tasks")
+            .update({ completed: true })
+            .eq("id", taskId);
+
+          if (permanentUpdateError) throw permanentUpdateError;
+          if (onTaskUpdated) onTaskUpdated(); // Update parent badge count
+        } catch (err) {
+          console.error("Error permanently marking task complete:", err.message);
+          // If permanent update fails, revert UI change
+          setTasks(prev => [...prev, task].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
+        } finally {
+          setPendingRemoval(prev => {
+            const newPending = { ...prev };
+            delete newPending[taskId];
+            return newPending;
+          });
+          delete timeoutRefs.current[taskId];
+        }
+      }, 5000); // 5 seconds to undo
+
+      setPendingRemoval(prev => ({ ...prev, [taskId]: task })); // Store the task object itself
+      timeoutRefs.current[taskId] = timeoutId;
+    } catch (err) {
+      alert("Error updating task: " + err.message);
+    }
+  };
+
+  const handleUndoComplete = async (taskId) => {
+    clearTimeout(timeoutRefs.current[taskId]);
+    delete timeoutRefs.current[taskId];
+
+    setPendingRemoval(prev => {
+      const newPending = { ...prev };
+      delete newPending[taskId];
+      return newPending;
+    });
+
+    try {
+      const { error } = await supabase
+        .from("tasks")
+        .update({ completed: false })
+        .eq("id", taskId);
+
+      if (error) throw error;
+      if (onTaskUpdated) onTaskUpdated(); // Update parent badge count
+      fetchTasks(); // Re-fetch to get the task back in the list
+    } catch (err) {
+      alert("Error updating task: " + err.message);
+    }
+  };
+
+  if (loading) return (
+    <div className="space-y-4 py-2 animate-pulse">
+      <div className="h-4 bg-white/5 rounded w-3/4"></div>
+      <div className="h-3 bg-white/5 rounded w-1/2"></div>
+    </div>
+  );
 
   return (
     <>
       <div className="space-y-4">
-        {[
-          ["Send final payment reminder", "Emma & Liam’s Wedding"],
-          ["Confirm seating plan updates", "Emma & Liam’s Wedding"],
-          ["Review guest list updates", "Hope for All Charity Gala"],
-        ].map(([task, event]) => (
-          <div key={task} className="flex gap-3">
-            <span className="mt-1 h-4 w-4 rounded-full border border-slate-500" />
-            <div>
-              <p className="text-sm font-medium text-white">{task}</p>
-              <p className="text-xs text-purple-300">{event}</p>
+        {tasks.length > 0 ? (
+          tasks.map((task) => (
+            <div key={task.id} className="group flex items-start gap-3">
+              <button 
+                onClick={() => handleToggleComplete(task.id)}
+                className="mt-1 h-4 w-4 rounded-full border border-slate-500 shrink-0 hover:bg-emerald-500/20 hover:border-emerald-500 transition-all flex items-center justify-center group/btn"
+                title="Mark as complete"
+              >
+                <Icon name="check" className="text-[10px] text-emerald-400 opacity-0 group-hover/btn:opacity-100" />
+              </button>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-white line-clamp-1">{task.title}</p>
+                <p className="text-xs text-purple-300 line-clamp-1">{task.event_name}</p>
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        ) : (
+          <p className="py-4 text-center text-xs text-slate-500 italic">All tasks completed! âœ¨</p>
+        )}
       </div>
 
       <button 
@@ -405,31 +555,203 @@ function TaskPanelContent() {
   );
 }
 
-function MeetingPanelContent() {
+function ScheduleMeetingModal({ isOpen, onClose, onSave }) {
+  const [formData, setFormData] = useState({
+    title: "",
+    start_time: "",
+    end_time: "",
+    contact_name: ""
+  });
+  const [timeError, setTimeError] = useState("");
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="w-full max-w-md bg-[#141218] border border-white/10 rounded-[2rem] p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+        <h3 className="text-xl font-bold text-white mb-6 font-heading tracking-tight uppercase text-center">Schedule Meeting</h3>
+        <form onSubmit={(e) => { 
+          e.preventDefault(); 
+          setTimeError(""); // Clear previous errors
+
+          const start = new Date(formData.start_time);
+          const end = new Date(formData.end_time);
+
+          if (end <= start) {
+            setTimeError("End time must be after start time.");
+            return;
+          }
+
+          onSave(formData); 
+        }} className="space-y-5">
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Meeting Purpose</label>
+            <input 
+              type="text" 
+              required 
+              placeholder="e.g. Seating Plan Review" 
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:ring-1 focus:ring-violet-500 transition-all" 
+              value={formData.title} 
+              onChange={e => setFormData({...formData, title: e.target.value})} 
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Starts At</label>
+              <input 
+                type="datetime-local" 
+                required 
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-xs text-white outline-none focus:ring-1 focus:ring-violet-500" 
+                value={formData.start_time} 
+                onChange={e => setFormData({...formData, start_time: e.target.value})} 
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Ends At</label>
+              <input 
+                type="datetime-local" 
+                required 
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-xs text-white outline-none focus:ring-1 focus:ring-violet-500" 
+                value={formData.end_time} 
+                onChange={e => setFormData({...formData, end_time: e.target.value})} 
+              />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Guest / Contact</label>
+            <input 
+              type="text" 
+              required 
+              placeholder="e.g. Venue Coordinator" 
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:ring-1 focus:ring-violet-500 transition-all" 
+              value={formData.contact_name} 
+              onChange={e => setFormData({...formData, contact_name: e.target.value})} 
+            />
+          </div>
+          {timeError && (
+            <p className="text-rose-400 text-xs text-center">{timeError}</p>
+          )}
+          <div className="flex gap-3 pt-4">
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-3 rounded-xl border border-white/10 text-gray-400 text-[10px] font-black uppercase tracking-widest hover:bg-white/5 transition-all">Cancel</button>
+            <button type="submit" className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-[10px] font-black uppercase tracking-widest shadow-xl shadow-violet-900/40 hover:opacity-90 active:scale-95 transition-all">Schedule</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function MeetingPanelContent({ onMeetingUpdated }) {
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
+  const [meetings, setMeetings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const fetchMeetings = useCallback(async () => {
+    if (!currentUser) return;
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from("meetings")
+        .select("*")
+        .eq("user_id", currentUser.id)
+        .gte("start_time", `${today}T00:00:00`)
+        .lte("start_time", `${today}T23:59:59`)
+        .order("start_time", { ascending: true })
+        .limit(3);
+
+      if (error) throw error;
+      setMeetings(data || []);
+    } catch (err) {
+      console.error("Error fetching meetings:", err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    fetchMeetings();
+  }, [fetchMeetings]);
+
+  const handleDeleteMeeting = async (meetingId) => {
+    if (!window.confirm("Are you sure you want to delete this meeting?")) return;
+    
+    try {
+      const { error } = await supabase
+        .from("meetings")
+        .delete()
+        .eq("id", meetingId);
+
+      if (error) throw error;
+      
+      fetchMeetings();
+      if (onMeetingUpdated) onMeetingUpdated();
+    } catch (err) {
+      alert("Error deleting meeting: " + err.message);
+    }
+  };
+
+  const handleSaveMeeting = async (formData) => {
+    try {
+      const { error } = await supabase
+        .from("meetings")
+        .insert([{ ...formData, user_id: currentUser.id }]);
+
+      if (error) throw error;
+      
+      setIsModalOpen(false);
+      fetchMeetings();
+      if (onMeetingUpdated) onMeetingUpdated();
+    } catch (err) {
+      alert("Error saving meeting: " + err.message);
+    }
+  };
+
+  if (loading) return (
+    <div className="space-y-4 py-2 animate-pulse">
+      <div className="h-4 bg-white/5 rounded w-3/4"></div>
+      <div className="h-3 bg-white/5 rounded w-1/2"></div>
+    </div>
+  );
 
   return (
     <>
       <div className="space-y-5">
-        <div>
-          <p className="text-sm font-semibold">Seating Plan Approval Meeting</p>
-          <p className="text-xs text-slate-400">10:00 AM – 10:30 AM</p>
-          <p className="text-xs text-slate-400">Venue Coordinator – Sophia Reynolds</p>
-        </div>
-
-        <div>
-          <p className="text-sm font-semibold">Initial Planning Call for Brann’s Birthday Party</p>
-          <p className="text-xs text-slate-400">10:45 AM – 11:15 AM</p>
-          <p className="text-xs text-slate-400">Client – Brann Callahan</p>
-        </div>
+        {meetings.length > 0 ? meetings.map((meeting) => (
+          <div key={meeting.id} className="group flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-white truncate">{meeting.title}</p>
+              <p className="text-xs text-slate-400">
+                {new Date(meeting.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} â€“ {new Date(meeting.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </p>
+              <p className="text-xs text-purple-300 truncate">{meeting.contact_name}</p>
+            </div>
+            <button 
+              onClick={() => handleDeleteMeeting(meeting.id)}
+              className="mt-0.5 opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-400 transition-all p-1"
+              title="Delete meeting"
+            >
+              <Icon name="delete" className="text-lg" />
+            </button>
+          </div>
+        )) : (
+          <p className="py-4 text-center text-xs text-slate-500 italic">No meetings scheduled for today.</p>
+        )}
       </div>
 
       <button 
-        onClick={() => navigate("/meetings")}
+        onClick={() => setIsModalOpen(true)}
         className="mt-6 text-sm font-semibold text-purple-400 hover:text-purple-300"
       >
         + Schedule Meeting
       </button>
+
+      <ScheduleMeetingModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onSave={handleSaveMeeting} 
+      />
     </>
   );
 }
@@ -446,10 +768,10 @@ function ProjectsWorkedContent() {
 
       <div className="w-full space-y-2 text-xs text-slate-300">
         {[
-          ["bg-purple-500", "Emma & Liam’s Wedding"],
+          ["bg-purple-500", "Emma & Liamâ€™s Wedding"],
           ["bg-blue-400", "Hope for All Charity Gala"],
-          ["bg-green-500", "Clay’s Birthday Party"],
-          ["bg-orange-400", "Brann’s Birthday Party"],
+          ["bg-green-500", "Clayâ€™s Birthday Party"],
+          ["bg-orange-400", "Brannâ€™s Birthday Party"],
         ].map(([color, label]) => (
           <div key={label} className="flex items-center gap-2">
             <span className={`h-2 w-2 rounded-full ${color}`} />
@@ -465,9 +787,9 @@ function UpcomingEventsContent() {
   return (
     <div className="grid gap-4 md:grid-cols-3">
       {[
-        ["Emma & Liam’s Wedding", "3 days left", "83%", "from-purple-900/80 to-blue-500/30"],
+        ["Emma & Liamâ€™s Wedding", "3 days left", "83%", "from-purple-900/80 to-blue-500/30"],
         ["Hope for All Charity Gala", "12 days left", "67%", "from-blue-900/70 to-cyan-400/30"],
-        ["Clay’s Birthday Party", "18 days left", "48%", "from-pink-900/70 to-fuchsia-400/30"],
+        ["Clayâ€™s Birthday Party", "18 days left", "48%", "from-pink-900/70 to-fuchsia-400/30"],
       ].map(([title, days, progress, gradient]) => (
         <div key={title} className={`rounded-2xl bg-gradient-to-br ${gradient} p-4`}>
           <div className="mb-5 flex justify-between">
@@ -498,8 +820,8 @@ function AlertsContent() {
     <div className="divide-y divide-white/10">
       {[
         ["check_circle", "text-green-400", "Seating plan needs approval for", "Hope for All Charity Gala"],
-        ["error", "text-red-400", "Mia Thompson’s payment was declined for", "Emma & Liam’s Wedding"],
-        ["error", "text-red-400", "DJ not confirmed", "Clay’s Birthday Party"],
+        ["error", "text-red-400", "Mia Thompsonâ€™s payment was declined for", "Emma & Liamâ€™s Wedding"],
+        ["error", "text-red-400", "DJ not confirmed", "Clayâ€™s Birthday Party"],
         ["error", "text-red-400", "Photo vendor reply pending", "Hope for All Charity Gala"],
       ].map(([icon, color, text, event]) => (
         <div key={`${text}-${event}`} className="flex gap-3 py-4">
@@ -566,12 +888,18 @@ function ToolsSection() {
     <section className="space-y-4">
       <SectionTitle>My Tools</SectionTitle>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 xl:grid-cols-2 2xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 xl:grid-cols-2 2xl:grid-cols-5">
         <ToolCard 
           icon="shopping_bag" 
           label="Marketplace" 
           color="text-purple-400" 
           onClick={() => navigate("/marketplace")}
+        />
+        <ToolCard 
+          icon="add_business" 
+          label="Create Listing" 
+          color="text-emerald-400" 
+          onClick={() => navigate("/marketplace/new")}
         />
         <ToolCard 
           icon="sync" 
@@ -596,8 +924,9 @@ function ToolsSection() {
   );
 }
 
-function AccountSection() {
+function AccountSection({ role, profile }) {
   const navigate = useNavigate();
+  const isVendor = role === "vendor" || role === "tasker" || role === "event_planner";
 
   return (
     <section className="space-y-4">
@@ -605,6 +934,16 @@ function AccountSection() {
 
       <div className="overflow-hidden rounded-3xl border border-yellow-500/20 bg-slate-950/70 backdrop-blur-xl">
         <MenuItem icon="person" label="Profile Information" color="text-purple-400" onClick={() => navigate("/profile")} />
+        <MenuItem icon="account_balance_wallet" label="My Wallet" color="text-emerald-400" onClick={() => navigate("/wallet")} />
+        {isVendor ? (
+          <>
+            <MenuItem icon="account_balance_wallet" label="Vendor Wallet" color="text-emerald-400" onClick={() => navigate("/vendor-wallet")} />
+            <MenuItem icon="cases" label="Vendor Portfolio" color="text-purple-400" onClick={() => navigate("/vendor-portfolio")} />
+            <MenuItem icon="insights" label="Vendor Insights" color="text-yellow-400" onClick={() => navigate("/vendor-insights")} />
+            <MenuItem icon="auto_awesome" label="Vendor Genie" color="text-purple-400" onClick={() => navigate("/vendor-genie")} />
+          </>
+        ) : null}
+        <MenuItem icon="inventory_2" label="My Listings" color="text-emerald-400" onClick={() => navigate("/marketplace/my-listings")} />
         <MenuItem icon="workspace_premium" label="Subscription & Billing" color="text-yellow-400" onClick={() => navigate("/payments")} />
         <MenuItem icon="credit_card" label="Payment Methods" color="text-green-400" onClick={() => navigate("/payments")} />
         <MenuItem icon="dashboard_customize" label="My Templates" color="text-purple-400" onClick={() => navigate("/templates")} />
@@ -625,10 +964,16 @@ function SupportSection() {
 
   const handleSignOut = () => {
     if (window.confirm("Are you sure you want to sign out?")) {
+      // DEMO ONLY: Clear temporary admin session
+      localStorage.removeItem("ig_demo_admin_user");
+      sessionStorage.removeItem("super_admin_2fa_verified");
+
       // Clear local storage if needed
       localStorage.clear();
-      // Redirect to home or login page
-      window.location.href = "/";
+      
+      // Redirect to admin login if signing out from administrative area
+      const isAdminArea = window.location.pathname.startsWith("/admin");
+      window.location.href = isAdminArea ? "/admin/login" : "/";
     }
   };
 
@@ -646,23 +991,57 @@ function SupportSection() {
 }
 
 export default function Profile() {
+  const { currentUser, role, profile } = useAuth();
+  const showCreateListing = true; // Enable Marketplace creation for all roles
   const [user, setUser] = useState(null);
+  const [taskCount, setTaskCount] = useState(0);
+  const [meetingCount, setMeetingCount] = useState(0);
+
+  const getTaskCount = async () => {
+    if (!currentUser) return;
+    const { count, error } = await supabase
+      .from("tasks")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", currentUser.id)
+      .eq("completed", false);
+    
+    if (!error) setTaskCount(count || 0);
+  };
+
+  const getMeetingCount = async () => {
+    if (!currentUser) return;
+    const today = new Date().toISOString().split('T')[0];
+    const { count, error } = await supabase
+      .from("meetings")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", currentUser.id)
+      .gte("start_time", `${today}T00:00:00`)
+      .lte("start_time", `${today}T23:59:59`);
+    
+    if (!error) setMeetingCount(count || 0);
+  };
 
   useEffect(() => {
     setUser(getUserProfile());
-  }, []);
+    getTaskCount();
+    getMeetingCount();
+  }, [currentUser]);
 
   if (!user) return null;
 
-  const name = user.name || "Maya Brooks";
-  const email = user.email || "maya.brooks@email.com";
+  const name = currentUser?.full_name || currentUser?.name || user.name || "Maya Brooks";
+  const email = currentUser?.email || user.email || "maya.brooks@email.com";
   const tier = user.tier || "Event Manager";
   const eventsHosted = user.eventsHosted || 24;
   const totalGuests = user.totalGuests || 1248;
   const points = user.points || 1560;
 
   return (
-      <div className="space-y-5">
+    <div className="flex min-h-screen bg-[#0f0e13] p-4 gap-6 font-sans">
+      <DesktopSidebar />
+      
+      <div className="flex-1 space-y-6 min-w-0">
+            <DesktopHeader name={name} tier={tier} showCreateListing={showCreateListing} />
             <MobileHero
               name={name}
               email={email}
@@ -683,14 +1062,14 @@ export default function Profile() {
 
             <UpgradeBanner />
 
-            <div className="hidden space-y-5 xl:block">
-              <section className="grid gap-5 xl:grid-cols-2 2xl:grid-cols-[1fr_1fr_0.9fr]">
-                <DashboardPanel title="Today’s Tasks" count="12">
-                  <TaskPanelContent />
+            <div className="hidden space-y-6 lg:block">
+              <section className="grid gap-6 lg:grid-cols-2 2xl:grid-cols-[1fr_1fr_0.9fr]">
+                <DashboardPanel title="Todayâ€™s Tasks" count={taskCount > 0 ? taskCount : null}>
+                  <TaskPanelContent onTaskUpdated={getTaskCount} />
                 </DashboardPanel>
 
-                <DashboardPanel title="Today’s Meetings" count="5">
-                  <MeetingPanelContent />
+                <DashboardPanel title="Todayâ€™s Meetings" count={meetingCount > 0 ? meetingCount : null}>
+                  <MeetingPanelContent onMeetingUpdated={getMeetingCount} />
                 </DashboardPanel>
 
                 <div className="xl:col-span-2 2xl:col-span-1">
@@ -700,7 +1079,7 @@ export default function Profile() {
                 </div>
               </section>
 
-              <section className="grid gap-5 2xl:grid-cols-[1.4fr_0.9fr]">
+              <section className="grid gap-6 2xl:grid-cols-[1.4fr_0.9fr]">
                 <DashboardPanel title="Upcoming Events">
                   <UpcomingEventsContent />
                 </DashboardPanel>
@@ -712,22 +1091,22 @@ export default function Profile() {
 
               <RecentTemplates />
 
-              <div className="grid gap-5 2xl:grid-cols-[1fr_1fr]">
-                <ToolsSection />
+              <div className="grid gap-6 2xl:grid-cols-[1fr_1fr]">
+                <ToolsSection showCreateListing={showCreateListing} />
                 <SupportSection />
               </div>
 
-              <AccountSection />
+              <AccountSection showCreateListing={showCreateListing} />
             </div>
 
-            <div className="space-y-6 xl:hidden">
+            <div className="space-y-6 lg:hidden">
               <section className="grid gap-5 lg:grid-cols-3">
-                <DashboardPanel title="Today’s Tasks" count="12">
-                  <TaskPanelContent />
+                <DashboardPanel title="Todayâ€™s Tasks" count={taskCount > 0 ? taskCount : null}>
+                  <TaskPanelContent onTaskUpdated={getTaskCount} />
                 </DashboardPanel>
 
-                <DashboardPanel title="Today’s Meetings" count="5">
-                  <MeetingPanelContent />
+                <DashboardPanel title="Todayâ€™s Meetings" count={meetingCount > 0 ? meetingCount : null}>
+                  <MeetingPanelContent onMeetingUpdated={getMeetingCount} />
                 </DashboardPanel>
 
                 <DashboardPanel title="Projects Worked">
@@ -746,10 +1125,11 @@ export default function Profile() {
               </section>
 
               <RecentTemplates />
-              <ToolsSection />
-              <AccountSection />
+              <ToolsSection showCreateListing={showCreateListing} />
+              <AccountSection role={role} profile={profile} showCreateListing={showCreateListing} />
               <SupportSection />
             </div>
+        </div>
       </div>
   );
 }

@@ -1,54 +1,91 @@
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
 import "./App.css";
 import { AuthProvider } from "./auth/AuthContext";
 import ProtectedRoute from "./auth/ProtectedRoute";
-import { USER_ROLES } from "./auth/roles";
+import AdminProtectedRoute from "./auth/AdminProtectedRoute";
+import AdminLayout from "./components/AdminLayout";
+import PlaceholderPage from "./components/PlaceholderPage";
+import { NORMAL_USER_ROLES, USER_ROLES } from "./services/roles";
 
-import Layout from "./components/Layout";
-import PlaceholderPage from "./screens/PlaceholderPage";
-import RoleDashboard from "./screens/dashboard/RoleDashboard";
+import Dashboard from "./screens/Dashboard";
 import Login from "./screens/Login";
-import Unauthorized from "./screens/auth/Unauthorized";
+import AdminLogin from "./screens/AdminLogin";
+import SuperAdminTwoFactor from "./screens/SuperAdminTwoFactor";
+import SuperAdminDashboard from "./screens/SuperAdminDashboard";
+import AdminDashboard from "./screens/AdminDashboard";
+import AdminRoles from "./screens/AdminRoles";
+import AdminUsers from "./screens/AdminUsers";
+import Unauthorized from "./screens/Unauthorized";
 import Profile from "./screens/Profile";
 import Feed from "./screens/Feed";
 import EventMemories from "./screens/EventMemories";
 import Landing from "./screens/Landing";
 import Events from "./screens/Events";
 import Bookings from "./screens/Bookings";
+import BookingDetails from "./screens/BookingDetails";
 import EVoucher from "./screens/EVoucher";
 import GuestManagement from "./screens/GuestManagement";
+import Guests from "./screens/Guests";
 import Analytics from "./screens/Analytics";
 import TemplateGallery from "./screens/TemplateGallery";
+import Templates from "./screens/Templates";
+import Withdrawals from "./screens/Withdrawals";
 import Scanner from "./screens/Scanner";
 import CreateEvent from "./screens/CreateEvent";
 import Settings from "./screens/Settings";
 import Calendar from "./screens/Calendar";
 import Inbox from "./screens/Inbox";
-import Payments from "./screens/Payments"; 
+import Payments from "./screens/Payments";
 import Reports from "./screens/Reports";
 import Integrations from "./screens/Integrations";
 import EventDetails from "./screens/EventDetails";
 import Marketplace from "./screens/Marketplace";
+import MarketplaceDetails from "./screens/MarketplaceDetails";
+import CreateMarketplaceListing from "./screens/CreateMarketplaceListing";
+import VendorReview from "./screens/VendorReview";
+import VendorPortfolio from "./screens/VendorPortfolio";
+import VendorWallet from "./screens/VendorWallet";
+import AdminVendorManagement from "./screens/AdminVendorManagement";
+import VendorInsights from "./screens/VendorInsights";
+import VendorBooking from "./screens/VendorBooking";
+import VendorGenie from "./screens/VendorGenie";
+import Wallet from "./screens/Wallet";
+import Pricing from "./screens/Pricing";
+import Checkout from "./screens/Checkout";
+import SharedMemoryPreview from "./screens/SharedMemoryPreview";
 import Points from "./screens/Points";
 import Wish from "./screens/Wish";
-import Genie from "./screens/Genie";
+import SummonGenie from "./screens/SummonGenie";
 import Gallery from "./screens/Gallery";
 import Financials from "./screens/Financials";
 import Help from "./screens/Help";
 import Support from "./screens/Support";
 import Notifications from "./screens/Notifications";
+import NotificationSettings from "./screens/NotificationSettings";
 import Tasks from "./screens/Tasks";
 import Meetings from "./screens/Meetings";
-import WhatsNew from "./screens/WhatsNew"; 
+import WhatsNew from "./screens/WhatsNew";
 import Invoices from "./screens/Invoices";
 import MyTickets from "./screens/MyTickets";
-import UsersManagement from "./screens/management/UsersManagement";
-import EventsManagement from "./screens/management/EventsManagement";
-import VendorsManagement from "./screens/management/VendorsManagement";
-import PlatformSettings from "./screens/management/PlatformSettings";
+import SeatSelection from "./screens/SeatSelection";
+import CreationSuccess from "./screens/CreationSuccess";
+import MyAccount from "./screens/MyAccount";
+import MyTemplates from "./screens/MyTemplates";
+import PaymentMethods from "./screens/PaymentMethods";
+import Billing from "./screens/Billing";
+import SeatingPlanner from "./screens/SeatingPlanner";
+import VenueBuilder from "./screens/VenueBuilder";
 
-// Placeholder wrapper for title prop
-const PlaceholderPageWrapper = ({ title }) => <PlaceholderPage title={title} />;
+function AdminModulePlaceholder({ title, description, icon }) {
+  return (
+    <PlaceholderPage
+      title={title}
+      description={description || "This admin module is routed and ready for Supabase-backed data."}
+      icon={icon}
+      backLink={{ path: "/admin", label: "Back to Admin" }}
+    />
+  );
+}
 
 export default function App() {
   return (
@@ -57,60 +94,281 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Login />} />
+          <Route path="/pricing" element={<Pricing />} />
+          <Route path="/shared/event/:eventId" element={<SharedMemoryPreview />} />
+          <Route path="/shared/memory/:memoryId" element={<SharedMemoryPreview />} />
+          <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
 
-          <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-            {/* Main Navigation */}
-            <Route path="/dashboard" element={<RoleDashboard />} />
-            <Route path="/home" element={<RoleDashboard />} /> {/* Same as dashboard */}
+          <Route
+            path="/admin/2fa"
+            element={
+              <AdminProtectedRoute allowedRoles={[USER_ROLES.SUPER_ADMIN]} requireSuperAdmin2FA={false}>
+                <SuperAdminTwoFactor />
+              </AdminProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin"
+            element={
+              <AdminProtectedRoute>
+                <AdminLayout />
+              </AdminProtectedRoute>
+            }
+          >
+            <Route index element={<AdminDashboard />} />
+            <Route
+              path="super"
+              element={
+                <AdminProtectedRoute allowedRoles={[USER_ROLES.SUPER_ADMIN]}>
+                  <SuperAdminDashboard />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="roles"
+              element={
+                <AdminProtectedRoute requiredPermission="manage_roles">
+                  <AdminRoles />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="users"
+              element={
+                <AdminProtectedRoute requiredPermission="view_all_users">
+                  <AdminUsers />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="permissions"
+              element={
+                <AdminProtectedRoute requiredPermission="assign_permissions">
+                  <AdminModulePlaceholder
+                    title="Permissions"
+                    description="Create and manage the permission catalog used by custom admin roles."
+                    icon="key"
+                  />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="feed"
+              element={
+                <AdminProtectedRoute requiredPermission="moderate_feed">
+                  <AdminModulePlaceholder
+                    title="Feed Moderation"
+                    description="Review event memories, comments, shared previews, and reported feed activity."
+                    icon="dynamic_feed"
+                  />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="marketplace"
+              element={
+                <AdminProtectedRoute requiredPermission="approve_marketplace_listings">
+                  <AdminModulePlaceholder
+                    title="Marketplace Approvals"
+                    description="Review marketplace listings, approve vendors, and moderate flagged content."
+                    icon="storefront"
+                  />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="vendors"
+              element={
+                <AdminProtectedRoute requiredPermission="manage_vendors">
+                  <AdminVendorManagement />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="vendor-reviews"
+              element={
+                <AdminProtectedRoute requiredPermission="moderate_vendor_reviews">
+                  <AdminModulePlaceholder
+                    title="Vendor Reviews Moderation"
+                    description="Review and moderate vendor reviews."
+                    icon="reviews"
+                  />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="vendor-wallets"
+              element={
+                <AdminProtectedRoute requiredPermission="manage_all_vendor_wallets">
+                  <AdminModulePlaceholder
+                    title="Vendor Wallets"
+                    description="Manage all vendor wallets and platform commissions."
+                    icon="account_balance_wallet"
+                  />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="vendor-profiles"
+              element={
+                <AdminProtectedRoute requiredPermission="manage_all_vendor_profiles">
+                  <AdminModulePlaceholder
+                    title="Vendor Profiles"
+                    description="Moderate and manage all vendor profiles."
+                    icon="store"
+                  />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="events"
+              element={
+                <AdminProtectedRoute requiredPermission="view_all_events">
+                  <AdminModulePlaceholder title="Events" description="View and manage events across InviteGenie." icon="event_available" />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="financials"
+              element={
+                <AdminProtectedRoute requiredPermission="view_all_financials">
+                  <AdminModulePlaceholder
+                    title="Financials"
+                    description="Monitor platform financials, fees, payouts, and commission policies."
+                    icon="payments"
+                  />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="withdrawals"
+              element={
+                <AdminProtectedRoute requiredPermission="manage_payouts">
+                  <Withdrawals />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="pricing"
+              element={
+                <AdminProtectedRoute requiredPermission="manage_pricing">
+                  <AdminModulePlaceholder
+                    title="Pricing"
+                    description="Manage local demo pricing plans before Supabase billing is connected."
+                    icon="sell"
+                  />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="audit-logs"
+              element={
+                <AdminProtectedRoute requiredPermission="view_audit_logs">
+                  <AdminModulePlaceholder
+                    title="Audit Logs"
+                    description="Review sensitive admin actions and security events."
+                    icon="manage_search"
+                  />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="platform-settings"
+              element={
+                <AdminProtectedRoute requiredPermission="manage_platform_settings">
+                  <AdminModulePlaceholder
+                    title="Platform Settings"
+                    description="Manage platform configuration, commission rates, and 2FA settings."
+                    icon="settings"
+                  />
+                </AdminProtectedRoute>
+              }
+            />
+          </Route>
+
+          <Route element={<AdminProtectedRoute><Outlet /></AdminProtectedRoute>}>
+            <Route path="/users-management" element={<Navigate to="/admin/users" replace />} />
+            <Route path="/events-management" element={<Navigate to="/admin/events" replace />} />
+            <Route path="/vendors-management" element={<Navigate to="/admin/marketplace" replace />} />
+            <Route path="/finance-management" element={<Navigate to="/admin/financials" replace />} />
+            <Route path="/content-moderation" element={<Navigate to="/admin/marketplace" replace />} />
+            <Route path="/support-management" element={<Navigate to="/admin/users" replace />} />
+            <Route path="/platform-settings" element={<Navigate to="/admin/platform-settings" replace />} />
+            <Route path="/system-audit-log" element={<Navigate to="/admin/audit-logs" replace />} />
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={NORMAL_USER_ROLES}><Outlet /></ProtectedRoute>}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/home" element={<Dashboard />} />
             <Route path="/events" element={<Events />} />
+            <Route path="/events/new" element={<ProtectedRoute requiredPermission="create_event"><CreateEvent /></ProtectedRoute>} />
             <Route path="/events/:eventId" element={<EventDetails />} />
+            <Route path="/creation-success/:eventId" element={<CreationSuccess />} />
             <Route path="/marketplace" element={<Marketplace />} />
-            <Route path="/create-invitation" element={<CreateEvent />} />
+            <Route path="/marketplace/new" element={<ProtectedRoute requiredPermission="create_marketplace_listing"><CreateMarketplaceListing /></ProtectedRoute>} />
+            <Route path="/marketplace/:providerId" element={<MarketplaceDetails />} />
+            <Route path="/marketplace/:providerId/review" element={<ProtectedRoute requiredAnyPermissions={["review_vendor", "browse_marketplace"]}><VendorReview /></ProtectedRoute>} />
+            <Route path="/marketplace/:providerId/portfolio" element={<VendorPortfolio />} />
+            <Route path="/marketplace/vendor/:vendorId" element={<MarketplaceDetails />} />
+            <Route path="/marketplace/:providerId/book" element={<ProtectedRoute requiredAnyPermissions={["book_vendor", "browse_marketplace"]}><VendorBooking /></ProtectedRoute>} />
+            <Route path="/checkout" element={<Checkout />} />
+            <Route path="/withdrawals" element={<ProtectedRoute requiredAnyPermissions={["view_own_withdrawals", "view_company_withdrawals", "view_withdrawals", "manage_payouts"]}><Withdrawals /></ProtectedRoute>} />
+            <Route path="/create-event" element={<ProtectedRoute requiredPermission="create_event"><CreateEvent /></ProtectedRoute>} />
+            <Route path="/create-invitation" element={<ProtectedRoute requiredPermission="create_event"><CreateEvent /></ProtectedRoute>} />
             <Route path="/invitations/templates" element={<TemplateGallery />} />
-            <Route path="/my-templates" element={<PlaceholderPage title="My Templates" />} />
+            <Route path="/templates" element={<Templates />} />
+            <Route path="/my-templates" element={<MyTemplates />} />
             <Route path="/my-tickets" element={<MyTickets />} />
             <Route path="/feed" element={<Feed />} />
             <Route path="/feed/upload" element={<WhatsNew />} />
             <Route path="/gallery" element={<Gallery />} />
             <Route path="/gallery/upload/:eventId" element={<Gallery />} />
+            <Route path="/events/:eventId/memories" element={<EventMemories />} />
+            <Route path="/memories/:eventId" element={<EventMemories />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/inbox" element={<Inbox />} />
-
-            {/* Business */}
+            <Route path="/guests" element={<Guests />} />
+            <Route path="/guest-management" element={<GuestManagement />} />
             <Route path="/payments" element={<Payments />} />
-            <Route path="/payment-methods" element={<PlaceholderPage title="Payment Methods" />} />
-            <Route path="/billing" element={<PlaceholderPage title="Subscription & Billing" />} />
+            <Route path="/payment-methods" element={<PaymentMethods />} />
+            <Route path="/billing" element={<Billing />} />
             <Route path="/financials" element={<Financials />} />
             <Route path="/reports" element={<Reports />} />
+            <Route path="/invoices" element={<Invoices />} />
             <Route path="/integrations" element={<Integrations />} />
-
-            {/* Admin */}
-            <Route path="/users-management" element={<UsersManagement />} />
-            <Route path="/events-management" element={<EventsManagement />} />
-            <Route path="/vendors-management" element={<VendorsManagement />} />
-            <Route path="/finance-management" element={<Financials />} />
-            <Route path="/content-moderation" element={<WhatsNew />} />
-            <Route path="/support-management" element={<Support />} />
-            <Route path="/platform-settings" element={<PlatformSettings />} />
-
-            {/* Genie / Fun */}
+            <Route path="/venue-builder" element={<VenueBuilder />} />
             <Route path="/convert-points" element={<Points />} />
             <Route path="/make-a-wish" element={<Wish />} />
-            <Route path="/summon-genie" element={<Genie />} />
-
-            {/* Account */}
+            <Route path="/summon-genie" element={<SummonGenie />} />
+            <Route path="/genie" element={<SummonGenie />} />
             <Route path="/profile" element={<Profile />} />
-            <Route path="/notification-settings" element={<PlaceholderPage title="Notification Settings" />} />
+            <Route path="/my-account" element={<MyAccount />} />
+            <Route path="/notifications" element={<Notifications />} />
+            <Route path="/notification-settings" element={<NotificationSettings />} />
+            <Route path="/tasks" element={<Tasks />} />
+            <Route path="/meetings" element={<Meetings />} />
             <Route path="/settings" element={<Settings />} />
-
-            {/* Legacy/Fallback routes */}
+            <Route path="/help" element={<Help />} />
+            <Route path="/support" element={<Support />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/scanner" element={<Scanner />} />
             <Route path="/bookings" element={<Bookings />} />
+            <Route path="/bookings/:bookingId" element={<BookingDetails />} />
+            <Route path="/bookings/:bookingId/voucher" element={<EVoucher />} />
             <Route path="/evoucher" element={<EVoucher />} />
+            <Route path="/seat-selection/:eventId" element={<SeatSelection />} />
+            <Route path="/seating-planner/:eventId" element={<SeatingPlanner />} />
+            <Route path="/vendor-wallet" element={<ProtectedRoute requiredPermission="view_vendor_wallet"><VendorWallet /></ProtectedRoute>} />
+            <Route path="/vendor-portfolio" element={<ProtectedRoute requiredPermission="manage_vendor_portfolio"><VendorPortfolio /></ProtectedRoute>} />
+            <Route path="/vendor-insights" element={<ProtectedRoute requiredAnyPermissions={["view_vendor_insights", "advanced_vendor_insights"]}><VendorInsights /></ProtectedRoute>} />
+            <Route path="/vendor-genie" element={<ProtectedRoute requiredAnyPermissions={["use_vendor_genie", "manage_ai_vendor_tools"]}><VendorGenie /></ProtectedRoute>} />
+            <Route path="/wallet" element={<ProtectedRoute requiredAnyPermissions={["view_wallet", "view_vendor_wallet", "view_all_wallets"]}><Wallet /></ProtectedRoute>} />
             <Route path="/tickets/buy/:eventId" element={<EventDetails />} />
           </Route>
+
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </AuthProvider>

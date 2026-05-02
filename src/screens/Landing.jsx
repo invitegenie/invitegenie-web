@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+﻿import { useNavigate } from "react-router-dom";
 import { ImageCard } from "../components/RichCards";
 
 export default function Landing() {
@@ -9,7 +9,7 @@ export default function Landing() {
       {/* Navigation */}
       <nav className="fixed top-0 z-50 flex w-full items-center justify-between px-8 py-6 backdrop-blur-md">
         <span className="bg-gradient-to-r from-purple-400 to-emerald-300 bg-clip-text text-2xl font-bold font-heading text-transparent">
-          InviteGenie
+          Invite Genie
         </span>
         <div className="flex items-center gap-4">
           <button onClick={() => navigate("/login")} className="text-sm font-bold text-slate-300 hover:text-white transition-colors">

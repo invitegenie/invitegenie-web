@@ -1,8 +1,9 @@
 import { useNavigate } from "react-router-dom";
+import { useSearch } from "../contexts/SearchContext";
 
 export default function FloatingGenieButton() {
   const navigate = useNavigate();
-
+  const { searchQuery, setSearchQuery } = useSearch(); // Not directly used for filtering here, but available
   return (
     <button
       onClick={() => navigate("/summon-genie")}

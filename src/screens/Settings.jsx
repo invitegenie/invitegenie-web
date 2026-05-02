@@ -1,14 +1,18 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import Layout from "../components/Layout";
 import PageTitle from "../components/PageTitle";
+import { useAuth } from "../auth/AuthContext";
+import { DEMO_ACCOUNTS } from "../services/roles";
 
 export default function Settings() {
+  const { currentUser, setUser } = useAuth();
   const [settings, setSettings] = useState({
     emailNotifications: true,
     smsNotifications: false,
     theme: "dark",
     autoSave: true,
     language: "en",
+    // This is a settings screen, global search doesn't apply directly here.
   });
 
   const handleToggle = (key) => {
@@ -24,6 +28,15 @@ export default function Settings() {
     alert("Settings saved successfully!");
   };
 
+  const handleDemoUserChange = (userId) => {
+    const nextUser = DEMO_ACCOUNTS.find((user) => user.id === userId);
+    if (!nextUser) return;
+    setUser({
+      ...nextUser,
+      plan: `${nextUser.tier || "Demo"} Account`,
+    });
+  };
+
   return (
     <Layout>
       <div className="max-w-3xl mx-auto space-y-8 pb-28">
@@ -31,6 +44,24 @@ export default function Settings() {
           title="Settings"
           subtitle="Customize your InviteGenie experience."
         />
+
+        <section className="rounded-3xl border border-white/10 bg-slate-900/60 p-6 shadow-xl backdrop-blur-xl">
+          <h3 className="text-xl font-bold text-white mb-2">Switch Demo Account</h3>
+          <p className="mb-5 text-sm text-slate-400">
+            Use this selector to test marketplace, event, finance, and admin navigation by role.
+          </p>
+          <select
+            value={currentUser?.id || ""}
+            onChange={(event) => handleDemoUserChange(event.target.value)}
+            className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none focus:border-violet-400/50"
+          >
+            {DEMO_ACCOUNTS.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.full_name} - {user.role}
+              </option>
+            ))}
+          </select>
+        </section>
 
         {/* Notifications */}
         <section className="rounded-3xl border border-white/10 bg-slate-900/60 p-6 shadow-xl backdrop-blur-xl">
@@ -107,8 +138,8 @@ export default function Settings() {
                 className="w-full bg-slate-950/50 border border-white/10 text-white rounded-lg px-4 py-2"
               >
                 <option value="en">English</option>
-                <option value="es">Español</option>
-                <option value="fr">Français</option>
+                <option value="es">EspaÃ±ol</option>
+                <option value="fr">FranÃ§ais</option>
                 <option value="de">Deutsch</option>
               </select>
             </div>

@@ -1,7 +1,7 @@
-import React from "react";
-import { useAuth } from "../../auth/AuthContext";
-import { USER_ROLES } from "../../auth/roles";
-import Dashboard from "../Dashboard"; // Default Dashboard
+﻿import React from "react";
+import { useAuth } from "../auth/AuthContext";
+import { USER_ROLES } from "../services/roles";
+import Dashboard from "./Dashboard"; // Fixed relative path
 
 export default function RoleDashboard() {
   const { role, currentUser } = useAuth();

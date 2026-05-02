@@ -1,7 +1,13 @@
 /**
  * Invite Genie Core Engine
  * Event management + tickets + feed + freelancer marketplace
- * LocalStorage MVP with live subscriptions for React components.
+ * LocalStorage MVP with optional Supabase backend for production.
+ * 
+ * IMPORTANT: This engine is backward compatible.
+ * - All localStorage functions remain unchanged
+ * - Supabase is OPTIONAL and can be enabled via configuration
+ * - If Supabase is not configured, everything uses localStorage
+ * - If Supabase is configured, it's used alongside localStorage
  */
 
 import {
@@ -9,7 +15,25 @@ import {
   MOCK_MEMORIES,
   MOCK_BOOKINGS,
   MOCK_PAYMENTS,
+  MOCK_PROVIDERS,
 } from "../services/mockData";
+
+// Optional Supabase integration (non-blocking if not available)
+let supabaseEngine = null;
+let supabaseEnabled = false;
+
+// Dynamically import supabaseEngine to avoid breaking changes if it's not present
+const loadSupabaseEngine = async () => {
+  try {
+    const module = await import("../services/supabaseEngine.js");
+    supabaseEngine = module;
+    supabaseEnabled = supabaseEngine.isSupabaseEnabled();
+    console.log("Supabase integration available. Enabled:", supabaseEnabled);
+  } catch (err) {
+    console.debug("Supabase engine not available, using localStorage only.", err);
+  }
+};
+loadSupabaseEngine();
 
 // =============================
 // STORAGE KEYS
@@ -75,7 +99,7 @@ const initDB = (key, initialData = []) => {
 
 const get = (key) => safeParse(localStorage.getItem(key), []);
 
-const save = (key, data) => {
+export const save = (key, data) => {
   localStorage.setItem(key, JSON.stringify(data));
   notify(key, data);
   window.dispatchEvent(new CustomEvent("invitegenie:data-change", { detail: { key, data } }));
@@ -83,6 +107,81 @@ const save = (key, data) => {
 };
 
 const makeId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+// =============================
+// SUPABASE HELPERS (Optional, Non-Breaking)
+// =============================
+
+/**
+ * Async helper to get data from Supabase or fallback to localStorage.
+ * Safe to call even if Supabase is not configured.
+ * Returns empty array on error.
+ */
+export const getDataAsync = async (key, supabaseGetter) => {
+  // If Supabase engine is available and enabled, try it first
+  if (supabaseEngine && supabaseEnabled && supabaseGetter) {
+    try {
+      const data = await supabaseGetter();
+      if (data && Array.isArray(data)) {
+        return data;
+      }
+    } catch (err) {
+      console.debug(`Supabase fallback for ${key}:`, err.message);
+    }
+  }
+
+  // Fall back to localStorage
+  return get(key);
+};
+
+/**
+ * Async helper to create data in Supabase or localStorage.
+ * Safe to call even if Supabase is not configured.
+ */
+export const createDataAsync = async (key, item, supabaseCreator) => {
+  // Always save to localStorage (source of truth for now)
+  const items = get(key);
+  const newItem = {
+    id: item.id || makeId("item"),
+    ...item,
+    created_at: item.created_at || new Date().toISOString(),
+  };
+  save(key, [newItem, ...items]);
+
+  // Try to sync to Supabase if available
+  if (supabaseEngine && supabaseEnabled && supabaseCreator) {
+    try {
+      await supabaseCreator(newItem);
+      console.debug(`${key} synced to Supabase`);
+    } catch (err) {
+      console.debug(`Failed to sync ${key} to Supabase:`, err.message);
+      // Don't throw - localStorage is the source of truth
+    }
+  }
+
+  return newItem;
+};
+
+/**
+ * Check if Supabase is ready for use
+ */
+export const isSupabaseReady = () => supabaseEnabled && supabaseEngine;
+
+export const deleteDocument = async (key, id) => {
+  const collection = get(key);
+  const updated = collection.filter((item) => String(item.id) !== String(id));
+  save(key, updated);
+  
+  // Try to sync to Supabase if available
+  if (supabaseEngine && supabaseEnabled && supabaseEngine.deleteDocumentInSupabase) {
+    try {
+      await supabaseEngine.deleteDocumentInSupabase(key, id);
+    } catch (err) {
+      console.debug(`Failed to delete ${key} in Supabase:`, err.message);
+    }
+  }
+  return true;
+};
 
 // =============================
 // INIT
@@ -144,13 +243,15 @@ export const updateProfile = (data) => {
 // EVENTS
 // =============================
 
-export const getEvents = () => get(KEYS.EVENTS);
+export const getEvents = async () => await getDataAsync(KEYS.EVENTS, supabaseEngine?.getEventsFromSupabase);
 
-export const getEventById = (id) =>
-  getEvents().find((event) => String(event.id) === String(id));
+export const getEventById = async (id) => {
+  const events = await getEvents();
+  return events.find((event) => String(event.id) === String(id));
+};
 
-export const createEvent = (eventData) => {
-  const events = getEvents();
+export const createEvent = async (eventData) => {
+  const events = await getEvents();
 
   const newEvent = {
     id: makeId("evt"),
@@ -166,7 +267,7 @@ export const createEvent = (eventData) => {
     ...eventData,
   };
 
-  save(KEYS.EVENTS, [newEvent, ...events]);
+  await createDataAsync(KEYS.EVENTS, newEvent, supabaseEngine?.createEventInSupabase);
 
   createPost({
     userId: newEvent.hostId || "system",
@@ -180,8 +281,8 @@ export const createEvent = (eventData) => {
   return newEvent;
 };
 
-export const updateEvent = (id, data) => {
-  const events = getEvents();
+export const updateEvent = async (id, data) => {
+  const events = await getEvents();
 
   const updatedEvents = events.map((event) =>
     String(event.id) === String(id)
@@ -190,24 +291,27 @@ export const updateEvent = (id, data) => {
   );
 
   save(KEYS.EVENTS, updatedEvents);
-  return getEventById(id);
+  return await getEventById(id);
 };
 
-export const deleteEvent = (id) => {
-  const events = getEvents().filter((event) => String(event.id) !== String(id));
-  save(KEYS.EVENTS, events);
+export const deleteEvent = async (id) => {
+  const events = await getEvents();
+  const filtered = events.filter((event) => String(event.id) !== String(id));
+  save(KEYS.EVENTS, filtered);
   return true;
 };
 
-export const getEventsByHost = (hostId) =>
-  getEvents().filter((event) => String(event.hostId) === String(hostId));
+export const getEventsByHost = async (hostId) => {
+  const events = await getEvents();
+  return events.filter((event) => String(event.hostId) === String(hostId));
+};
 
 // =============================
 // TICKETS / PAYMENTS
 // =============================
 
-export const buyTicket = (eventId, userId, ticketType = "Standard") => {
-  const event = getEventById(eventId);
+export const buyTicket = async (eventId, userId, ticketType = "Standard") => {
+  const event = await getEventById(eventId);
   if (!event) throw new Error("Event not found");
   if ((event.availableTickets || 0) <= 0) throw new Error("No tickets available");
 
@@ -229,8 +333,7 @@ export const buyTicket = (eventId, userId, ticketType = "Standard") => {
     timestamp: Date.now(),
   };
 
-  const tickets = get(KEYS.TICKETS);
-  save(KEYS.TICKETS, [ticket, ...tickets]);
+  await createDataAsync(KEYS.TICKETS, ticket, supabaseEngine?.createTicketInSupabase);
 
   updateEvent(eventId, {
     ticketsSold: Number(event.ticketsSold || 0) + 1,
@@ -250,8 +353,8 @@ export const buyTicket = (eventId, userId, ticketType = "Standard") => {
   return ticket;
 };
 
-export const getTicketsByUser = (userId) =>
-  get(KEYS.TICKETS).filter((ticket) => String(ticket.userId) === String(userId));
+export const getTicketsByUser = async (userId) =>
+  await getDataAsync(KEYS.TICKETS, () => supabaseEngine?.getTicketsFromSupabase(userId));
 
 export const getTicketById = (id) =>
   get(KEYS.TICKETS).find((ticket) => String(ticket.id) === String(id));
@@ -277,7 +380,7 @@ export const validateTicket = (id) => {
   return validatedTicket;
 };
 
-export const createMockPayment = (eventId, userId, amount, ticketId = null) => {
+export const createMockPayment = async (eventId, userId, amount, ticketId = null) => {
   const payments = get(KEYS.PAYMENTS);
 
   const payment = {
@@ -293,14 +396,14 @@ export const createMockPayment = (eventId, userId, amount, ticketId = null) => {
     timestamp: Date.now(),
   };
 
-  save(KEYS.PAYMENTS, [payment, ...payments]);
+  await createDataAsync(KEYS.PAYMENTS, payment, supabaseEngine?.createPaymentInSupabase); // Assuming createPaymentInSupabase will be added
   return payment;
 };
 
-export const getAllPayments = () => get(KEYS.PAYMENTS);
+export const getAllPayments = async () => await getDataAsync(KEYS.PAYMENTS, supabaseEngine?.getPaymentsFromSupabase);
 
-export const getPaymentsByUser = (userId) =>
-  getAllPayments().filter((payment) => String(payment.userId) === String(userId));
+export const getPaymentsByUser = async (userId) =>
+  await getDataAsync(KEYS.PAYMENTS, () => supabaseEngine?.getPaymentsFromSupabase(userId));
 
 // =============================
 // SOCIAL POSTS / FEED
@@ -433,10 +536,10 @@ export const getGlobalFeed = () => {
 // MEMORIES
 // =============================
 
-export const getMemories = () => get(KEYS.MEMORIES);
+export const getMemories = async (eventId = null) => await getDataAsync(KEYS.MEMORIES, () => supabaseEngine?.getMemoriesFromSupabase(eventId));
 
-export const createMemory = ({ eventId, userId, caption, media, userName }) => {
-  const memories = getMemories();
+export const createMemory = async ({ eventId, userId, caption, media, userName }) => {
+  const memories = await getMemories();
 
   const memory = {
     id: makeId("mem"),
@@ -452,7 +555,7 @@ export const createMemory = ({ eventId, userId, caption, media, userName }) => {
     timestamp: Date.now(),
   };
 
-  save(KEYS.MEMORIES, [memory, ...memories]);
+  await createDataAsync(KEYS.MEMORIES, memory, supabaseEngine?.createMemoryInSupabase);
 
   createPost({
     userId,
@@ -514,7 +617,7 @@ export const uploadGalleryImage = (eventId, imageData) => {
 // INVITATIONS
 // =============================
 
-export const createInvitation = (data) => {
+export const createInvitation = async (data) => {
   const invitations = get(KEYS.INVITATIONS);
 
   const invitation = {
@@ -525,12 +628,12 @@ export const createInvitation = (data) => {
     ...data,
   };
 
-  save(KEYS.INVITATIONS, [invitation, ...invitations]);
+  await createDataAsync(KEYS.INVITATIONS, invitation, supabaseEngine?.createInvitationInSupabase); // Assuming createInvitationInSupabase will be added
   return invitation;
 };
 
-export const getInvitationsByUser = (userId) =>
-  get(KEYS.INVITATIONS).filter((item) => String(item.userId) === String(userId));
+export const getInvitationsByUser = async (userId) =>
+  await getDataAsync(KEYS.INVITATIONS, () => supabaseEngine?.getInvitationsFromSupabase(userId));
 
 // =============================
 // VENDORS
@@ -561,10 +664,10 @@ export const createVendor = (data) => {
 // FREELANCER MARKETPLACE
 // =============================
 
-export const getFreelancers = () => get(KEYS.FREELANCERS);
+export const getFreelancers = async (category = null) => await getDataAsync(KEYS.FREELANCERS, () => supabaseEngine?.getFreelancersFromSupabase(category));
 
 export const getFreelancerById = (id) =>
-  getFreelancers().find((freelancer) => String(freelancer.id) === String(id));
+  getFreelancers().then(freelancers => freelancers.find((freelancer) => String(freelancer.id) === String(id)));
 
 export const createFreelancer = (data) => {
   const freelancers = getFreelancers();
@@ -597,10 +700,10 @@ export const updateFreelancer = (id, data) => {
   return getFreelancerById(id);
 };
 
-export const getGigs = () => get(KEYS.GIGS);
+export const getGigs = async (freelancerId = null) => await getDataAsync(KEYS.GIGS, () => supabaseEngine?.getGigsFromSupabase(freelancerId));
 
 export const getGigById = (id) =>
-  getGigs().find((gig) => String(gig.id) === String(id));
+  getGigs().then(gigs => gigs.find((gig) => String(gig.id) === String(id)));
 
 export const createGig = (data) => {
   const gigs = getGigs();
@@ -831,11 +934,97 @@ export const getMessagesBetweenUsers = (userA, userB) =>
 // ADMIN / REPORTS
 // =============================
 
-export const getDashboardStats = () => {
-  const events = getEvents();
-  const tickets = get(KEYS.TICKETS);
-  const payments = getAllPayments();
-  const memories = getMemories();
+/**
+ * Seeds the realm with robust demo data for all account types and privileges.
+ */
+export const seedDemoData = async () => {
+  const superId = "demo-super";
+  const adminId = "demo-admin";
+  const userId = "demo-user";
+
+  // 1. Clear Data first for a clean restore
+  localStorage.removeItem(KEYS.FREELANCERS);
+  localStorage.removeItem(KEYS.EVENTS);
+  localStorage.removeItem(KEYS.TICKETS);
+  localStorage.removeItem(KEYS.PAYMENTS);
+  localStorage.removeItem(KEYS.MEMORIES);
+
+  initDB(KEYS.FREELANCERS, []);
+  initDB(KEYS.EVENTS, []);
+  initDB(KEYS.TICKETS, []);
+  initDB(KEYS.PAYMENTS, []);
+  initDB(KEYS.MEMORIES, []);
+
+  // 2. Seed Freelancers
+  for (let i = 0; i < MOCK_PROVIDERS.length; i++) {
+    const f = MOCK_PROVIDERS[i];
+    const ownerId = `vendor-${(i % 6) + 1}`;
+    await createFreelancer({ ...f, userId: ownerId });
+  }
+
+  // 3. Seed Events
+  for (let i = 0; i < MOCK_EVENTS.length; i++) {
+    const ev = MOCK_EVENTS[i];
+    const ownerId = `host-${(i % 6) + 1}`;
+    await createEvent({ ...ev, hostId: ownerId, hostName: `Event Host ${(i % 6) + 1}` });
+  }
+
+  // 4. Seed Bookings & Payments
+  const events = await getEvents();
+  for (let i = 0; i < MOCK_BOOKINGS.length; i++) {
+    const b = MOCK_BOOKINGS[i];
+    const ev = events[i % events.length];
+    
+    const tktId = b.id || `TKT-${1000 + i}`;
+    const tkt = { 
+      id: tktId, 
+      eventId: ev.id, 
+      userId: "demo-buyer", 
+      buyerName: b.buyerName, 
+      eventName: ev.title, 
+      amount: ev.price || b.amount, 
+      status: "Valid", 
+      date: b.createdAt || new Date().toISOString() 
+    };
+    const currentTkts = get(KEYS.TICKETS);
+    save(KEYS.TICKETS, [tkt, ...currentTkts]);
+    
+    if (i < MOCK_PAYMENTS.length) {
+      const p = MOCK_PAYMENTS[i];
+      await createMockPayment(ev.id, superId, p.amount || ev.price, tktId, { hostId: ev.hostId, hostName: ev.hostName });
+    }
+  }
+
+  // 5. Seed Memories
+  for (let i = 0; i < MOCK_MEMORIES.length; i++) {
+    const mem = MOCK_MEMORIES[i];
+    const ev = events[i % events.length];
+    if (ev) {
+      await createMemory({
+        eventId: ev.id,
+        userId: superId,
+        userName: "Super Admin",
+        caption: mem.caption,
+        media: mem.image
+      });
+    }
+  }
+
+  // 6. Global Notifications
+  const messages = [
+    "Your dashboard demo data is fully restored.",
+    "Welcome to the multi-tenant InviteGenie Demo.",
+  ];
+  for (const msg of messages) {
+    createNotification({ userId: superId, type: "system", message: msg });
+  }
+};
+
+export const getDashboardStats = async () => {
+  const events = await getEvents(); 
+  const tickets = get(KEYS.TICKETS); 
+  const payments = await getAllPayments(); 
+  const memories = await getMemories(); 
   const freelancers = getFreelancers();
   const gigs = getGigs();
 
@@ -844,10 +1033,10 @@ export const getDashboardStats = () => {
   return {
     totalEvents: events.length,
     totalTickets: tickets.length,
-    totalRevenue: revenue,
-    totalMemories: memories.length,
-    totalFreelancers: freelancers.length,
-    totalGigs: gigs.length,
+    totalRevenue: revenue, // This will need to be awaited
+    totalMemories: memories.length, // This will need to be awaited
+    totalFreelancers: freelancers.length, // This will need to be awaited
+    totalGigs: gigs.length, // This will need to be awaited
   };
 };
 

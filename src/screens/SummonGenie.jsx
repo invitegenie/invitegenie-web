@@ -1,13 +1,19 @@
-import { useState, useRef, useEffect } from "react";
+﻿import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import * as AIService from "../services/aiAssistantService";
+import { recommendProviders } from "../services/mockData";
+import { useSearch } from "../contexts/SearchContext";
 
 export default function SummonGenie() {
+  const navigate = useNavigate();
   const [messages, setMessages] = useState([
     { role: "model", text: "Greetings! I am your Invite Genie. I can help you brainstorm themes, write invitation text, or plan your entire event. What shall we conjure today?" }
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+  const { searchQuery, setSearchQuery } = useSearch(); // Not directly used for filtering here, but available
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -27,6 +33,12 @@ export default function SummonGenie() {
     setIsLoading(true);
 
     try {
+      // Simple local logic: if the user describes a need, suggest marketplace providers
+      if (text.toLowerCase().includes("need") || text.toLowerCase().includes("find")) {
+        const matches = recommendProviders({ query: text });
+        setSuggestions(matches);
+      }
+
       const response = await AIService.getGenieResponse(messages, text);
       setMessages(prev => [...prev, { role: "model", text: response }]);
     } catch (error) {
@@ -36,7 +48,7 @@ export default function SummonGenie() {
     }
   };
 
-  const suggestions = [
+  const quickPrompts = [
     { label: "Event Ideas", prompt: "Suggest 3 unique event concepts for a summer gala in Douala." },
     { label: "Invite Text", prompt: "Write a magical formal invitation for a royal-themed wedding." },
     { label: "Theme Suggestion", prompt: "Suggest a futuristic cyberpunk theme for a product launch party." },
@@ -87,10 +99,30 @@ export default function SummonGenie() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Suggestions & Input */}
+        {/* Marketplace Suggestions Panel */}
+        {suggestions.length > 0 && (
+          <div className="mb-6 animate-in slide-in-from-bottom-4 duration-500">
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 px-2">Genie Marketplace Matches</p>
+            <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+              {suggestions.map((provider) => (
+                <button
+                  key={provider.id}
+                  onClick={() => navigate(`/marketplace/${provider.id}`)}
+                  className="shrink-0 w-64 p-4 rounded-[2rem] bg-violet-600/10 border border-violet-500/20 text-left hover:bg-violet-600/20 transition-all group"
+                >
+                  <p className="text-sm font-bold text-white group-hover:text-violet-300">{provider.name}</p>
+                  <p className="text-[10px] text-slate-400 mt-1 uppercase font-black">{provider.category} â€¢ {provider.location}</p>
+                  <p className="text-xs font-black text-emerald-400 mt-3">From FCFA {provider.startingPrice.toLocaleString()}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Quick Prompts & Input */}
         <div className="space-y-4">
           <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-            {suggestions.map((s, i) => (
+            {quickPrompts.map((s, i) => (
               <button 
                 key={i}
                 onClick={() => handleSend(s.prompt)}

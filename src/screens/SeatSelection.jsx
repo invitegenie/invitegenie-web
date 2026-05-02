@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import * as Engine from "../auth/coreEngine";
@@ -13,20 +13,31 @@ export default function SeatSelection() {
   const [event, setEvent] = useState(null);
 
   useEffect(() => {
-    setEvent(Engine.getEventById(eventId));
-    // For MVP, we'll try to find a map for this event, or load a default
-    const eventMap = Engine.getSeatMapByEvent(eventId) || {
-       eventId,
-       objects: Engine.getVenues()?.[0]?.layout || []
+    let mounted = true;
+
+    async function loadSelection() {
+      const loadedEvent = await Engine.getEventById(eventId);
+      if (!mounted) return;
+
+      setEvent(loadedEvent);
+      const eventMap = Engine.getSeatMapByEvent(eventId) || {
+        eventId,
+        objects: Engine.getVenues()?.[0]?.layout || []
+      };
+      setMap(eventMap);
+    }
+
+    loadSelection();
+    return () => {
+      mounted = false;
     };
-    setMap(eventMap);
   }, [eventId]);
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!selectedSeat) return alert("Please pick a magical spot first!");
     
     try {
-      const ticket = Engine.buyTicket(eventId, currentUser.id, "Standard");
+      const ticket = await Engine.buyTicket(eventId, currentUser.id, "Standard");
       Engine.assignGuestToSeat(eventId, ticket.id, selectedSeat.id);
       navigate(`/bookings/${ticket.id}/voucher`);
     } catch (e) {

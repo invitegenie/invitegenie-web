@@ -1,7 +1,17 @@
-import { useNavigate } from "react-router-dom";
+﻿import { useNavigate } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext";
+import { isAdminRole, USER_ROLES } from "../services/roles";
 
 export default function Unauthorized() {
   const navigate = useNavigate();
+  const { role } = useAuth();
+  const isAdmin = isAdminRole(role);
+  const returnPath = isAdmin
+    ? role === USER_ROLES.SUPER_ADMIN
+      ? "/admin/super"
+      : "/admin"
+    : "/dashboard";
+
   return (
     <div className="min-h-screen bg-[#0f1014] flex flex-col items-center justify-center p-6 text-center font-sans">
       <div className="absolute h-[300px] w-[300px] rounded-full bg-rose-600/5 blur-[80px]" />
@@ -14,7 +24,7 @@ export default function Unauthorized() {
         <p className="text-slate-500 mb-10 leading-relaxed uppercase font-bold text-xs tracking-widest">
           The spirits indicate you do not have the clearance to enter this section. Please consult your administrator.
         </p>
-        <button onClick={() => navigate("/dashboard")} className="px-10 py-4 bg-white/5 border border-white/10 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all shadow-xl">Return to Dashboard</button>
+        <button onClick={() => navigate(returnPath)} className="px-10 py-4 bg-white/5 border border-white/10 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all shadow-xl">{isAdmin ? "Return to Console" : "Return to Dashboard"}</button>
       </div>
     </div>
   );

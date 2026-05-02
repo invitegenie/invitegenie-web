@@ -1,1 +1,1 @@
-// Redundant. Using centralized src/auth/AuthContext.jsx instead.
+﻿// Redundant. Using centralized src/auth/AuthContext.jsx instead.

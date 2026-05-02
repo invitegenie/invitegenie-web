@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
+import { useSearch } from "../contexts/SearchContext";
 
 const MOCK_BOOKINGS = [
   { id: "INV10011", date: "2029/02/15 10:30 AM", name: "Jackson Moore", event: "Symphony Under the Stars", category: "Diamond", price: 50000, qty: 2, amount: 100000, status: "Confirmed", voucher: "123456-MUSIC" },
@@ -15,7 +16,7 @@ const MOCK_BOOKINGS = [
 
 export default function Bookings() {
   const navigate = useNavigate();
-  const [search, setSearch] = useState("");
+  const { searchQuery, setSearchQuery } = useSearch();
   const [statusFilter, setStatusFilter] = useState("All");
   const [categoryFilter, setCategoryFilter] = useState("All Category");
   const [selectedId, setSelectedId] = useState(null);
@@ -23,17 +24,17 @@ export default function Bookings() {
 
   const filteredData = useMemo(() => {
     return MOCK_BOOKINGS.filter((item) => {
-      const matchesSearch = 
-        item.name.toLowerCase().includes(search.toLowerCase()) ||
-        item.event.toLowerCase().includes(search.toLowerCase()) ||
-        item.id.toLowerCase().includes(search.toLowerCase());
+      const matchesSearch =
+        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.event.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.id.toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesStatus = statusFilter === "All" || item.status === statusFilter;
       const matchesCategory = categoryFilter === "All Category" || item.category === categoryFilter;
 
       return matchesSearch && matchesStatus && matchesCategory;
     });
-  }, [search, statusFilter, categoryFilter]);
+  }, [searchQuery, statusFilter, categoryFilter]);
 
   return (
     <div className="max-w-[1440px] mx-auto space-y-6 pb-20 font-sans animate-in fade-in duration-500">
@@ -55,8 +56,8 @@ export default function Bookings() {
               type="text"
               placeholder="Search..."
               className="w-full bg-white/[0.03] border border-white/5 rounded-lg pl-9 pr-4 py-2 text-xs text-gray-300 outline-none focus:ring-1 focus:ring-violet-500/30 transition-all"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
           <div className="flex items-center gap-1.5">

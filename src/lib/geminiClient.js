@@ -150,6 +150,38 @@ For each theme, provide a one-line description that explains the concept and why
 };
 
 /**
+ * Generate a complete event draft for the create-event form.
+ */
+export const generateEventDraft = async (eventIdea = "", partialEvent = {}) => {
+  const prompt = `Create a complete event draft for an event management app.
+Return only valid JSON with this exact shape:
+{
+  "title": "short compelling event title",
+  "category": "Corporate|Wedding|Gala|Music|Elegant|Modern|General|Tech",
+  "dateOffsetDays": number,
+  "time": "HH:MM",
+  "location": "specific venue and city",
+  "description": "2-3 sentence polished public event description",
+  "price": number,
+  "totalTickets": number,
+  "artDirection": {
+    "headline": "2-5 word invite headline",
+    "palette": ["#hex", "#hex", "#hex"],
+    "motif": "unique visual motif",
+    "accent": "unique detail or symbol"
+  }
+}
+
+User idea: "${eventIdea || "a premium Invite Genie event"}"
+Existing form values: ${JSON.stringify(partialEvent)}
+
+Use realistic Cameroon/West Africa-friendly locations when no location is supplied. Make every draft feel distinct.`;
+
+  const response = await callGemini(prompt, { temperature: 0.9, maxTokens: 900 });
+  return parseEventDraftResponse(response, eventIdea, partialEvent);
+};
+
+/**
  * Generate vendor description
  */
 export const generateVendorDescription = async (vendorName, vendorType, services) => {
@@ -178,6 +210,28 @@ Highlight key metrics, trends, and recommendations for improvement. Keep it conc
  * Mock response when API is not configured
  */
 function getMockResponse(prompt) {
+  if (prompt.toLowerCase().includes('valid json') && prompt.toLowerCase().includes('event draft')) {
+    const categories = ["Corporate", "Wedding", "Gala", "Music", "Elegant", "Modern", "General", "Tech"];
+    const motifs = ["moonlit palm arches", "gold dust constellation", "emerald silk ribbons", "neon city sigil", "royal mask pattern", "starlit garden gates"];
+    const index = Math.floor(Math.random() * motifs.length);
+    return JSON.stringify({
+      title: `${["Royal", "Luminous", "Velvet", "Golden", "Aurora", "Prestige"][index]} ${categories[index % categories.length]} Night`,
+      category: categories[index % categories.length],
+      dateOffsetDays: 21 + index * 5,
+      time: ["18:00", "19:30", "20:00", "17:00", "16:30", "18:45"][index],
+      location: ["Hilton Yaounde", "Akwa Palace Douala", "Mountain Club Buea", "Canal Olympia Douala", "Kribi Beach Resort", "Bastos Art House"][index],
+      description: "Step into a polished celebration designed for connection, style, and unforgettable moments. Guests will enjoy a curated atmosphere with refined details, smooth entry, and a premium event experience from arrival to finale.",
+      price: [15000, 25000, 10000, 5000, 30000, 20000][index],
+      totalTickets: [180, 250, 120, 500, 160, 220][index],
+      artDirection: {
+        headline: "You Are Invited",
+        palette: [["#8B5CF6", "#22C55E", "#F9FAFB"], ["#7C3AED", "#F59E0B", "#111827"], ["#06B6D4", "#A855F7", "#F8FAFC"]][index % 3],
+        motif: motifs[index],
+        accent: ["crescent seal", "gold foil initials", "emerald spark line", "neon ticket frame", "masked crest", "soft floral constellation"][index],
+      },
+    });
+  }
+
   const responses = {
     description: "This is a spectacular and unforgettable experience that promises to delight every guest. From the moment you arrive, you'll be transported to a world of elegance and magic.",
     ideas: "1. Enchanted Garden Gala - A mystical outdoor celebration with magical lighting and whimsical decor\n2. Modern Elegance Soirée - A sophisticated indoor event with contemporary design and upscale ambiance\n3. Adventure Expedition - An action-packed celebration with interactive experiences and thrilling activities",
@@ -191,6 +245,49 @@ function getMockResponse(prompt) {
   return "The Genie's powers are being restored. Please try again in a moment!";
 }
 
+function parseEventDraftResponse(response, eventIdea, partialEvent) {
+  const fallback = buildFallbackEventDraft(eventIdea, partialEvent);
+  try {
+    const jsonText = String(response)
+      .replace(/```json/gi, "")
+      .replace(/```/g, "")
+      .trim();
+    const parsed = JSON.parse(jsonText);
+    return {
+      ...fallback,
+      ...parsed,
+      artDirection: {
+        ...fallback.artDirection,
+        ...(parsed.artDirection || {}),
+      },
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function buildFallbackEventDraft(eventIdea, partialEvent) {
+  const categories = ["Corporate", "Wedding", "Gala", "Music", "Elegant", "Modern", "General", "Tech"];
+  const seed = `${eventIdea || ""}${Date.now()}${Math.random()}`;
+  const index = Math.abs([...seed].reduce((sum, char) => sum + char.charCodeAt(0), 0)) % categories.length;
+  return {
+    title: partialEvent.title || `${["Luminous", "Royal", "Velvet", "Aurora", "Prestige", "Golden", "Summit", "Moonlit"][index]} ${categories[index]} Experience`,
+    category: partialEvent.category || categories[index],
+    dateOffsetDays: 21 + index * 3,
+    time: partialEvent.time || ["18:00", "19:00", "20:00", "17:30"][index % 4],
+    location: partialEvent.location || ["Hilton Yaounde", "Akwa Palace Douala", "Mountain Club Buea", "Canal Olympia Douala"][index % 4],
+    description: partialEvent.description || "A refined event experience crafted with beautiful details, smooth guest flow, and an atmosphere built for memorable moments.",
+    price: Number(partialEvent.price || [10000, 15000, 25000, 5000][index % 4]),
+    totalTickets: Number(partialEvent.totalTickets || [120, 180, 250, 400][index % 4]),
+    artDirection: {
+      headline: "You Are Invited",
+      palette: [["#8B5CF6", "#22C55E", "#F9FAFB"], ["#7C3AED", "#F59E0B", "#F8FAFC"], ["#06B6D4", "#A855F7", "#F9FAFB"]][index % 3],
+      motif: ["constellation lines", "royal arch", "silk ribbon", "neon frame"][index % 4],
+      accent: ["gold seal", "emerald flare", "violet spark", "glass ticket"][index % 4],
+    },
+  };
+}
+
 export const isGeminiConfigured = () => !!GEMINI_API_KEY;
 
 export default {
@@ -200,6 +297,7 @@ export default {
   improveEventDescription,
   generateInvitationText,
   suggestEventThemes,
+  generateEventDraft,
   generateVendorDescription,
   summarizeAppActivity,
   isGeminiConfigured,

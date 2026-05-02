@@ -1,5 +1,6 @@
-import { useNavigate } from "react-router-dom";
+﻿import { useNavigate } from "react-router-dom";
 import Icon from "../components/Icon";
+import Layout from "../components/Layout";
 
 export default function Tasks() {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ export default function Tasks() {
   ];
 
   return (
+    <Layout>
     <div className="space-y-5">
       <div className="mb-8 flex items-center gap-4 pt-4">
         <button
@@ -27,7 +29,7 @@ export default function Tasks() {
       <div className="space-y-3">
         {tasks.map((task, idx) => (
           <div
-            key={idx}
+            key={`task-${idx}`}
             className="flex items-start gap-4 rounded-2xl border border-white/10 bg-slate-950/70 p-4 backdrop-blur-xl"
           >
             <input
@@ -52,5 +54,6 @@ export default function Tasks() {
         Back to Profile
       </button>
     </div>
+    </Layout>
   );
 }

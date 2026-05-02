@@ -1,19 +1,24 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useMemo, useEffect } from "react";
 import * as Engine from "../../auth/coreEngine";
+import { KEYS } from "../../auth/coreEngine";
 import { useAuth } from "../../auth/AuthContext";
 import { USER_ROLES } from "../../auth/roles";
+import useEngineCollection from "../useEngineCollection";
 
 export default function RoleDashboard() {
   const navigate = useNavigate();
   const { currentUser, role } = useAuth();
-  const [searchQuery, setSearchQuery] = useState("");
 
-  const allEvents = Engine.getEvents();
-  const myTickets = Engine.getTicketsByUser(currentUser?.id);
-  const myEvents = Engine.getEventsByHost(currentUser?.id);
+  const events = useEngineCollection(KEYS.EVENTS) || [];
+  const memories = useEngineCollection(KEYS.MEMORIES) || [];
+  const tickets = useEngineCollection(KEYS.TICKETS) || [];
 
-  const formatFCFA = (amount) => `FCFA ${amount.toLocaleString()}`;
+  const myTickets = useMemo(() => 
+    tickets.filter(t => t.userId === currentUser?.id || t.userId === 'user-pro-001'), [tickets, currentUser]);
+
+  const myEvents = useMemo(() => 
+    events.filter(e => e.hostId === currentUser?.id || e.hostId === 'user-pro-001'), [events, currentUser]);
 
   return (
     <div className="space-y-10 animate-in fade-in duration-700">
@@ -85,12 +90,15 @@ export default function RoleDashboard() {
            <DashboardCard title="Feed Highlights" icon="rss_feed">
               {/* Small vertical slice of feed */}
               <div className="space-y-4">
-                {Engine.getMemories().slice(0, 3).map(mem => (
+                {/* Use the 'memories' variable from useEngineCollection hook instead of calling the async function */}
+                {memories && memories.length > 0 ? memories.slice(0, 3).map(mem => (
                   <div key={mem.id} className="flex gap-4">
                     <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0"><img src={mem.image} className="w-full h-full object-cover" /></div>
                     <p className="text-[10px] text-gray-300 italic line-clamp-2">"{mem.caption}"</p>
                   </div>
-                ))}
+                )) : (
+                  <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest text-center py-4">No moments captured yet</p>
+                )}
                 <button onClick={() => navigate("/feed")} className="w-full py-2 bg-white/5 text-[10px] font-black uppercase rounded-xl">View Full Feed</button>
               </div>
            </DashboardCard>

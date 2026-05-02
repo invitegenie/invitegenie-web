@@ -18,9 +18,14 @@ export function TemplateCard({ id, title, image, category, onClick }) {
   );
 }
 
-export function VendorCard({ name, service, image, rating, price }) {
+export function VendorCard({ id, name, service, image, rating, price }) {
+  const navigate = useNavigate();
+
   return (
-    <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-xl transition hover:bg-white/[0.06]">
+    <div 
+      onClick={() => id && navigate(`/marketplace/vendor/${id}`)}
+      className="overflow-hidden rounded-3xl border border-[#2A3342] bg-[#111827] p-4 shadow-lg transition hover:border-[#8B5CF6]/50 cursor-pointer group"
+    >
       <div className="relative mb-4 h-40 overflow-hidden rounded-2xl">
         <img src={image} alt={name} className="h-full w-full object-cover" />
         <div className="absolute right-2 top-2 rounded-full bg-slate-950/60 px-2 py-1 text-xs font-bold text-yellow-400 backdrop-blur-md">
@@ -31,7 +36,7 @@ export function VendorCard({ name, service, image, rating, price }) {
       <p className="text-sm text-slate-400">{service}</p>
       <div className="mt-4 flex items-center justify-between">
         <span className="text-xs font-bold text-purple-400 uppercase tracking-tight">{price}</span>
-        <button className="rounded-xl bg-white/5 px-4 py-2 text-xs font-bold text-white hover:bg-white/10">
+        <button className="rounded-xl bg-[#1F2937] px-4 py-2 text-xs font-bold text-white group-hover:bg-[#8B5CF6] transition-colors">
           View Profile
         </button>
       </div>

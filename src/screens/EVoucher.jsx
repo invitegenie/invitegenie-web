@@ -1,7 +1,10 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+﻿import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import * as Engine from "../auth/coreEngine";
+import { MOCK_BOOKINGS } from "./Bookings";
+import { getEventById as getDemoEventById } from "../services/mockData";
+import { getBookingById as getDemoBookingById, getTicketById as getDemoTicketById } from "../services/ticketingService";
 
 export default function EVoucher() {
   const { bookingId } = useParams();
@@ -12,20 +15,52 @@ export default function EVoucher() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    const tkt = Engine.getTicketById(bookingId);
-    if (tkt) {
-      setTicket(tkt);
-      const evt = Engine.getEventById(tkt.eventId);
-      setEvent(evt);
-      setUser(Engine.getCurrentUser());
+    let mounted = true;
+
+    async function loadVoucher() {
+      const demoBooking = getDemoBookingById(bookingId);
+      const tkt = demoBooking ? getDemoTicketById(demoBooking.ticketId) : getDemoTicketById(bookingId) || Engine.getTicketById(bookingId);
+      if (tkt) {
+        const evt = getDemoEventById(tkt.eventId) || await Engine.getEventById(tkt.eventId);
+        if (!mounted) return;
+        setTicket(tkt);
+        setEvent(evt);
+        setUser(Engine.getCurrentUser());
+      } else {
+        const mock = MOCK_BOOKINGS.find((booking) => String(booking.id) === String(bookingId));
+        if (!mounted || !mock) return;
+        setTicket({
+          id: mock.id,
+          type: mock.category,
+          eventName: mock.event,
+          buyerName: mock.name,
+          date: mock.date,
+          amount: mock.amount,
+          price: mock.amount,
+          qrValue: mock.voucher === "-" ? mock.id : mock.voucher,
+        });
+        setEvent({
+          title: mock.event,
+          category: mock.category,
+          location: "Cameroon",
+          date: mock.date,
+          image: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80&w=1200",
+        });
+        setUser(Engine.getCurrentUser());
+      }
     }
+
+    loadVoucher();
+    return () => {
+      mounted = false;
+    };
   }, [bookingId]);
 
   const handleShare = async () => {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'InviteGenie E-Voucher',
+          title: 'Invite Genie E-Voucher',
           text: `Check out my voucher for ${ticket?.eventName}!`,
           url: window.location.href,
         });
@@ -40,18 +75,21 @@ export default function EVoucher() {
 
   if (!ticket || !event) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4">
-          <span className="material-symbols-outlined text-gray-500 text-3xl">confirmation_number</span>
+      <Layout>
+        <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center">
+          <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4">
+            <span className="material-symbols-outlined text-gray-500 text-3xl">confirmation_number</span>
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-4">Voucher Not Found</h2>
+          <button onClick={() => navigate("/bookings")} className="px-6 py-2 bg-violet-600 rounded-xl font-bold text-white">Back to Bookings</button>
         </div>
-        <h2 className="text-2xl font-bold text-white mb-4">Voucher Not Found</h2>
-        <button onClick={() => navigate("/dashboard")} className="px-6 py-2 bg-violet-600 rounded-xl font-bold text-white">Return Home</button>
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="max-w-[1200px] mx-auto space-y-6 pb-20 font-sans animate-in fade-in duration-500 print:p-0">
+    <Layout>
+      <div className="max-w-[1200px] mx-auto space-y-6 pb-20 font-sans animate-in fade-in duration-500 print:p-0">
       {/* Header Actions */}
       <div className="flex flex-wrap items-center justify-between gap-4 print:hidden">
         <div>
@@ -103,7 +141,7 @@ export default function EVoucher() {
             <div className="grid grid-cols-2 gap-y-6 lg:gap-y-10">
               <div>
                 <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Guest Name</label>
-                <p className="text-sm font-semibold text-white">{user?.name || 'Valued Guest'}</p>
+                <p className="text-sm font-semibold text-white">{ticket.buyerName || user?.name || 'Valued Guest'}</p>
               </div>
               <div>
                 <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Invoice ID</label>
@@ -111,7 +149,7 @@ export default function EVoucher() {
               </div>
               <div>
                 <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Date & Time</label>
-                <p className="text-sm font-semibold text-white">{new Date(ticket.date).toLocaleDateString()} • {event.time || '12:00 PM'}</p>
+                <p className="text-sm font-semibold text-white">{new Date(ticket.date).toLocaleDateString()} â€¢ {event.time || '12:00 PM'}</p>
               </div>
               <div>
                 <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Category</label>
@@ -123,7 +161,7 @@ export default function EVoucher() {
               </div>
               <div>
                 <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Total Paid</label>
-                <p className="text-sm font-black text-white">FCFA {ticket.price?.toLocaleString()}</p>
+                <p className="text-sm font-black text-white">FCFA {Number(ticket.amount || ticket.price || 0).toLocaleString()}</p>
               </div>
             </div>
 
@@ -134,7 +172,7 @@ export default function EVoucher() {
                </div>
                <div className="flex items-center gap-2">
                  <span className="material-symbols-outlined text-violet-400">verified</span>
-                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Secured by InviteGenie</span>
+                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Secured by Invite Genie</span>
                </div>
             </div>
           </div>
@@ -206,7 +244,7 @@ export default function EVoucher() {
                 "Photography may occur during event",
               ].map((term, i) => (
                 <li key={i} className="text-xs text-gray-500 flex gap-2 leading-relaxed">
-                  <span className="text-violet-400">•</span>
+                  <span className="text-violet-400">â€¢</span>
                   {term}
                 </li>
               ))}
@@ -288,7 +326,8 @@ export default function EVoucher() {
             <span className="material-symbols-outlined text-[28px]">home</span>
          </button>
       </div>
-    </div>
+      </div>
+    </Layout>
   );
 }
 

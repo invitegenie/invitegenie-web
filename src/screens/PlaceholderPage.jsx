@@ -1,6 +1,9 @@
+﻿import Layout from "../components/Layout";
+
 export default function PlaceholderPage({ title = "Page" }) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#0f1014] to-slate-950 p-6">
+    <Layout>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#0f1014] to-slate-950 p-6">
       <div className="max-w-2xl mx-auto">
         {/* Decorative background elements */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -58,12 +61,13 @@ export default function PlaceholderPage({ title = "Page" }) {
             {/* Footer message */}
             <div className="text-center">
               <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">
-                ✨ More magic coming soon ✨
+                âœ¨ More magic coming soon âœ¨
               </p>
             </div>
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </Layout>
   );
 }

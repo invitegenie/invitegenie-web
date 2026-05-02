@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+﻿import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 
 function Icon({ name, className = "" }) {
@@ -50,7 +50,7 @@ export default function Help() {
         <div className="space-y-4">
           {faqs.map((faq, idx) => (
             <div
-              key={idx}
+              key={`faq-${idx}`}
               className="rounded-2xl border border-white/10 bg-slate-950/70 p-5 backdrop-blur-xl"
             >
               <h3 className="font-bold text-yellow-200">{faq.question}</h3>
