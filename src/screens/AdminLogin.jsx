@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+﻿﻿import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import Icon from "../components/Icon";
@@ -15,8 +15,10 @@ export default function AdminLogin() {
     e.preventDefault();
     setError("");
 
+    const cleanEmail = formData.email.trim().toLowerCase();
+
     try {
-      const result = await login(formData.email, formData.password, { portal: "admin" });
+      const result = await login(cleanEmail, formData.password, { portal: "admin" });
       if (result.role === USER_ROLES.SUPER_ADMIN) {
         navigate("/admin/2fa");
       } else {
@@ -51,6 +53,8 @@ export default function AdminLogin() {
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-3.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#8B5CF6]/50 transition-all"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                autoCapitalize="none"
+                autoCorrect="off"
               />
             </div>
 

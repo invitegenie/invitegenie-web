@@ -11,6 +11,7 @@
  */
 
 import { supabase, isSupabaseEnabled } from '../lib/supabaseClient';
+export { isSupabaseEnabled };
 
 // Helper to get data from localStorage
 const getFromLocalStorage = (key) => {

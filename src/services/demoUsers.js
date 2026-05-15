@@ -5,16 +5,16 @@ const DEMO_USERS_KEY = "demo_users";
 const now = "2026-05-01T12:00:00.000Z";
 
 const roleAccountType = {
-  normal_user: "Free User",
-  pro_user: "Pro User",
-  vendor: "Vendor Basic",
-  event_planner: "Event Planner",
-  enterprise_client: "Enterprise",
-  tasker: "Tasker",
-  checkin_agent: "Check-in Agent",
-  finance_admin: "Finance Admin",
-  app_admin: "App Admin",
-  super_admin: "Super Admin",
+  normal_user: "FREE",
+  pro_user: "PRO",
+  vendor: "BUSINESS",
+  event_planner: "PRO",
+  enterprise_client: "ENTERPRISE",
+  tasker: "FREE",
+  checkin_agent: "FREE",
+  finance_admin: "ENTERPRISE",
+  app_admin: "ENTERPRISE",
+  super_admin: "ENTERPRISE",
 };
 
 function initials(name) {
@@ -28,6 +28,7 @@ function initials(name) {
 }
 
 function buildUser({ id, full_name, email, password = "demo123", phone, role, city, country = "Cameroon", accountType }) {
+  const normalizedRole = normalizeRole(role);
   return {
     id,
     full_name,
@@ -36,7 +37,7 @@ function buildUser({ id, full_name, email, password = "demo123", phone, role, ci
     phone,
     role,
     accountType: accountType || roleAccountType[role] || role,
-    permissions: ROLE_PERMISSIONS[role] || [],
+    permissions: ROLE_PERMISSIONS[normalizedRole] || [],
     avatar: initials(full_name),
     city,
     country,
@@ -298,7 +299,8 @@ export function getDemoUsers() {
 
   const users = Array.from(byEmail.values()).map((user) => ({
     ...user,
-    permissions: user.permissions?.length ? user.permissions : ROLE_PERMISSIONS[user.role] || [],
+    accountType: roleAccountType[user.role] || user.accountType || "FREE",
+    permissions: user.permissions?.length ? user.permissions : ROLE_PERMISSIONS[normalizeRole(user.role)] || [],
   }));
 
   if (changed) localStorage.setItem(DEMO_USERS_KEY, JSON.stringify(users));
@@ -327,6 +329,7 @@ export function findDemoAccount(email, password) {
   return account 
     ? { 
         ...account, 
+        legacyRole: account.role,
         role: normalizeRole(account.role), 
         admin_role: isAdminRole(account.role) ? normalizeRole(account.role) : null 
       } 

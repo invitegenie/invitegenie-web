@@ -1,4 +1,4 @@
-﻿﻿import { Link } from "react-router-dom";
+﻿﻿﻿﻿import { Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { hasPermission } from "../services/roles";
 
@@ -11,11 +11,11 @@ const ADMIN_MODULES = [
     permission: "view_all_users",
   },
   {
-    title: "Marketplace Approvals",
-    description: "Review vendor listings and moderate marketplace content.",
+    title: "Storefront Moderation",
+    description: "Review storefront products, approve pending services, and hide inappropriate listings.",
     path: "/admin/marketplace",
     icon: "storefront",
-    permission: "approve_marketplace_listings",
+    permission: "moderate_storefronts",
   },
   {
     title: "Vendor Reviews",
@@ -51,6 +51,20 @@ const ADMIN_MODULES = [
     path: "/admin/events",
     icon: "event_available",
     permission: "view_all_events",
+  },
+  {
+    title: "Sponsorship Moderation",
+    description: "Review and moderate event sponsorships across the platform.",
+    path: "/admin/sponsorships",
+    icon: "stars",
+    permission: "moderate_event_sponsors",
+  },
+  {
+    title: "Payment Gateway",
+    description: "Monitor centralized payment flows across MoMo, Orange Money, Flutterwave, etc.",
+    path: "/admin/payments",
+    icon: "account_balance",
+    permission: "view_all_payments",
   },
   {
     title: "Financials",

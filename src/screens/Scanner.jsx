@@ -1,17 +1,27 @@
-﻿import { useState, useMemo, useEffect } from "react";
+﻿﻿import { useState, useMemo, useEffect } from "react";
 import Layout from "../components/Layout";
 import * as Engine from "../auth/coreEngine";
 import { KEYS } from "../auth/coreEngine";
+import { useAuth } from "../auth/AuthContext";
+import { scanTicket } from "../services/checkInService";
+import { getEvents } from "../services/mockData";
+import CheckInResultModal from "../components/CheckInResultModal";
+import VIPAccessBadge from "../components/VIPAccessBadge";
 
 export default function Scanner() {
+  const { currentUser, profile } = useAuth();
+  const userId = currentUser?.id || profile?.id;
   const [scanCode, setScanCode] = useState("");
   const [validationResult, setValidationResult] = useState(null);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [tickets, setTickets] = useState([]);
+  const [selectedEventId, setSelectedEventId] = useState("all");
+  const [events, setEvents] = useState([]);
 
   useEffect(() => {
     setTickets(Engine.getCollection(KEYS.TICKETS));
+    setEvents(getEvents());
     // Subscribe to updates so scan history stays current
     return Engine.subscribe(KEYS.TICKETS, setTickets);
   }, []);
@@ -26,15 +36,13 @@ export default function Scanner() {
       return;
     }
 
-    // Simulate network delay for "professional" feel
     setTimeout(() => {
-      const result = Engine.validateTicket(scanCode);
+      const result = scanTicket(scanCode, userId, selectedEventId);
       if (result.success) {
-        setValidationResult(result);
+        setValidationResult(result); // Shown in modal
         setScanCode("");
       } else {
-        setError(result.message);
-        setValidationResult(null);
+        setValidationResult(result); // Show error in modal
       }
       setIsLoading(false);
     }, 600);
@@ -42,7 +50,7 @@ export default function Scanner() {
 
   const recentCheckins = useMemo(() => {
     return tickets
-      .filter(t => t.status === "Validated")
+      .filter(t => t.ticketStatus === "checked_in" || t.status === "Validated")
       .sort((a, b) => new Date(b.checkedInAt) - new Date(a.checkedInAt))
       .slice(0, 10);
   }, [tickets]);
@@ -57,7 +65,14 @@ export default function Scanner() {
              <p className="text-gray-500 text-xs mt-1 uppercase font-bold tracking-[0.2em]">Validate Access â€¢ {recentCheckins.length} Recent Scans</p>
           </div>
           <div className="flex gap-2">
-            <button className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-white transition-all">Select Event</button>
+            <select 
+               value={selectedEventId} 
+               onChange={e => setSelectedEventId(e.target.value)}
+               className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-black text-white outline-none focus:border-violet-500"
+            >
+               <option value="all" className="bg-slate-900 text-white">All Active Events</option>
+               {events.map(ev => <option key={ev.id} value={ev.id} className="bg-slate-900 text-white">{ev.title}</option>)}
+            </select>
             <div className="px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-2">
                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">System Online</span>
@@ -126,28 +141,11 @@ export default function Scanner() {
 
           {/* Right Column: Active Result & History */}
           <div className="lg:col-span-4 space-y-6">
-            {/* Validation Feedback */}
-            <div className={`p-8 rounded-[2.5rem] border transition-all h-[320px] flex flex-col items-center justify-center text-center ${
-              validationResult ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-white/[0.02] border-white/5 border-dashed'
-            }`}>
-               {validationResult ? (
-                 <div className="animate-in zoom-in-95 duration-300">
-                    <div className="w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center text-white mx-auto mb-6 shadow-2xl shadow-emerald-500/40">
-                       <span className="material-symbols-outlined text-4xl">check_circle</span>
-                    </div>
-                    <h3 className="text-xl font-black text-white tracking-tighter uppercase">{validationResult.ticket.buyerName}</h3>
-                    <p className="text-emerald-400 text-xs font-bold uppercase tracking-widest mt-1">{validationResult.ticket.type} Pass</p>
-                    <div className="mt-6 pt-6 border-t border-emerald-500/10 flex flex-col gap-2">
-                       <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest">Event: <span className="text-gray-300">{validationResult.ticket.eventName}</span></p>
-                       <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest">ID: <span className="text-gray-300">{validationResult.ticket.id}</span></p>
-                    </div>
-                 </div>
-               ) : (
+            <div className="p-8 rounded-[2.5rem] border transition-all h-[320px] flex flex-col items-center justify-center text-center bg-white/[0.02] border-white/5 border-dashed">
                  <div className="text-gray-600">
                     <span className="material-symbols-outlined text-5xl mb-4 opacity-20">qr_code_2</span>
                     <p className="text-[10px] font-black uppercase tracking-[0.2em]">Awaiting Scan...</p>
                  </div>
-               )}
             </div>
 
             {/* Scan History */}
@@ -160,7 +158,10 @@ export default function Scanner() {
                           {tkt.buyerName?.charAt(0)}
                        </div>
                        <div className="flex-1 min-w-0">
-                          <p className="text-[11px] font-bold text-white truncate">{tkt.buyerName}</p>
+                          <div className="flex items-center gap-2">
+                             <p className="text-[11px] font-bold text-white truncate">{tkt.buyerName}</p>
+                             <VIPAccessBadge accessLevel={tkt.accessLevel} />
+                          </div>
                           <p className="text-[8px] text-gray-500 uppercase font-black tracking-tighter truncate">{tkt.eventName}</p>
                        </div>
                        <div className="text-right">
@@ -177,6 +178,7 @@ export default function Scanner() {
           </div>
         </div>
       </div>
+      <CheckInResultModal result={validationResult} onClose={() => setValidationResult(null)} />
       
       {/* Global CSS for scanning line animation */}
       <style>{`

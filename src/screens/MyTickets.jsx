@@ -1,7 +1,9 @@
-﻿import { useNavigate } from "react-router-dom";
+﻿﻿import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import { useAuth } from "../auth/AuthContext";
 import { getTicketsByUser } from "../services/ticketingService";
+import { getActiveSponsorBranding, injectSponsorsIntoTicket } from "../services/eventSponsorBrandingService";
+import VIPAccessBadge from "../components/VIPAccessBadge";
 
 export default function MyTickets() {
   const navigate = useNavigate();
@@ -26,7 +28,14 @@ export default function MyTickets() {
                     <h2 className="text-xl font-black text-white">{ticket.eventName}</h2>
                     <p className="mt-1 text-xs font-black uppercase tracking-widest text-violet-300">{ticket.id}</p>
                   </div>
-                  <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-[10px] font-black uppercase text-emerald-300">{ticket.status}</span>
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${
+                      ticket.ticketStatus === 'checked_in' ? 'bg-violet-600 text-white' : 'bg-emerald-400/10 text-emerald-300'
+                    }`}>
+                      {ticket.ticketStatus === 'checked_in' ? "Checked In" : ticket.ticketStatus || ticket.status}
+                    </span>
+                    <VIPAccessBadge accessLevel={ticket.accessLevel} />
+                  </div>
                 </div>
                 <div className="mt-5 grid grid-cols-2 gap-3">
                   <Info label="Buyer" value={ticket.buyerName} />
@@ -34,6 +43,23 @@ export default function MyTickets() {
                   <Info label="Quantity" value={ticket.quantity} />
                   <Info label="Paid" value={`FCFA ${Number(ticket.amount || ticket.price || 0).toLocaleString()}`} />
                 </div>
+                
+                {/* Ticket Sponsors Strip */}
+                {(() => {
+                  const sponsors = injectSponsorsIntoTicket(ticket, getActiveSponsorBranding(ticket.eventId));
+                  if (sponsors.length === 0) return null;
+                  return (
+                    <div className="mt-4 pt-4 border-t border-white/10">
+                      <p className="text-[8px] font-black uppercase tracking-widest text-slate-500 mb-2">Sponsored By</p>
+                      <div className="flex flex-wrap items-center gap-3">
+                        {sponsors.slice(0, 3).map((s) => (
+                          s.sponsorLogo ? <img key={s.id} src={s.sponsorLogo} alt={s.sponsorName} className="h-4 sm:h-5 object-contain opacity-60 grayscale hover:grayscale-0 transition" title={s.sponsorName} /> : <span key={s.id} className="text-[9px] font-bold text-slate-400">{s.sponsorName}</span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+                
               </div>
               <div className="grid gap-4 border-t border-white/10 bg-slate-950/50 p-5 sm:grid-cols-[160px_1fr]">
                 <img src={ticket.qrCodeUrl} alt={`${ticket.eventName} QR`} className="mx-auto h-40 w-40 rounded-2xl bg-white p-3" />

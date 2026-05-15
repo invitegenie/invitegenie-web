@@ -7,16 +7,12 @@ export default function HomeNavBar() {
   const showCreateListing = canCreateMarketplaceListing(currentUser?.role);
 
   const mainItems = [
-    { label: "Home / Dashboard", path: "/dashboard", icon: "dashboard", description: "Your event portfolio" },
-    { label: "Feed", path: "/feed", icon: "rss_feed", description: "Global highlights" },
     { label: "Marketplace", path: "/marketplace", icon: "storefront", description: "Browse services" },
-    { label: "Create an Invitation", path: "/create-invitation", icon: "edit_square", description: "New event" },
     { label: "Events", path: "/events", icon: "event", description: "Manage events" },
   ];
-
   return (
-    <div className="w-full bg-gradient-to-r from-slate-900 via-[#0f1014] to-slate-950 border-b border-white/10 p-6 overflow-x-auto no-scrollbar">
-      <div className="max-w-7xl mx-auto">
+    <div className="w-full border-b border-white/10 bg-gradient-to-r from-slate-900 via-[#0f1014] to-slate-950">
+      <div className="overflow-x-auto p-4">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 min-w-[600px]">
           {mainItems.map((item) => (
             <Link

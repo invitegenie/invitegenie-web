@@ -1,10 +1,12 @@
-﻿﻿import React, { useState, useMemo } from "react";
+﻿﻿﻿﻿import React, { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import Icon from "../components/Icon";
 import * as Engine from "../auth/coreEngine";
 import { KEYS } from "../auth/coreEngine";
 import useEngineCollection from "./useEngineCollection";
+import { sendMessage } from "../services/messagingService";
+import { getProviderById } from "../services/mockData";
 
 const BookingModal = ({ isOpen, onClose, vendor, onSubmit }) => {
   const [formData, setFormData] = useState({ date: '', requirements: '' });
@@ -68,10 +70,13 @@ export default function VendorDetails() {
   const allVendors = useEngineCollection(KEYS.VENDORS) || [];
   const [activeTab, setActiveTab] = useState("portfolio");
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
 
-  const vendor = useMemo(() => 
-    allVendors.find(v => String(v.id) === String(vendorId)), 
-  [allVendors, vendorId]);
+  const vendor = useMemo(() => {
+    const engineVendor = allVendors.find(v => String(v.id) === String(vendorId));
+    if (engineVendor) return engineVendor;
+    return getProviderById(vendorId);
+  }, [allVendors, vendorId]);
 
   const handleInquirySubmit = (data) => {
     // For now, mock the submission. Later this will sync to Supabase.
@@ -155,12 +160,20 @@ export default function VendorDetails() {
                 <span className="flex items-center gap-1.5"><Icon name="location_on" className="text-sm" /> {vendor.location || "Cameroon"}</span>
               </div>
             </div>
-            <button 
-              onClick={() => setIsBookingModalOpen(true)}
-              className="mx-auto md:mx-0 px-10 py-4 bg-gradient-to-r from-[#8B5CF6] to-[#22C55E] text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all"
-            >
-              Inquire Now
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3 mx-auto md:mx-0">
+              <button 
+                onClick={() => setIsBookingModalOpen(true)}
+                className="px-10 py-4 bg-gradient-to-r from-[#8B5CF6] to-[#22C55E] text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl hover:scale-[1.02] active:scale-95 transition-all"
+              >
+                Inquire Now
+              </button>
+              <button 
+                onClick={() => setIsMessageModalOpen(true)}
+                className="px-10 py-4 bg-white/5 border border-white/10 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl hover:bg-white/10 active:scale-95 transition-all"
+              >
+                Message
+              </button>
+            </div>
           </div>
         </div>
 
@@ -243,6 +256,50 @@ export default function VendorDetails() {
         vendor={vendor} 
         onSubmit={handleInquirySubmit}
       />
+      <MessageModal provider={vendor} open={isMessageModalOpen} onClose={() => setIsMessageModalOpen(false)} onInbox={() => navigate("/inbox")} />
     </Layout>
+  );
+}
+
+function MessageModal({ provider, open, onClose, onInbox }) {
+  const { currentUser, profile } = useAuth();
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+
+  if (!open) return null;
+
+  const handleSend = () => {
+    if (!text.trim()) return;
+    setSending(true);
+    setTimeout(() => {
+      sendMessage({
+        senderId: currentUser?.id || "demo-user",
+        senderName: profile?.full_name || currentUser?.name || "Guest",
+        receiverId: provider.ownerId || provider.userId || provider.sellerId || provider.id || "vendor",
+        receiverName: provider.businessName || provider.name || "Vendor",
+        text,
+        listingId: provider.id,
+        listingName: provider.title || provider.businessName || provider.name
+      });
+      setSending(false);
+      onClose();
+      onInbox();
+    }, 500);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/70 p-4 backdrop-blur">
+      <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#111827] p-6 shadow-2xl">
+        <div className="flex justify-between items-center mb-4 text-left">
+          <h2 className="text-xl font-black text-white">Message {provider.businessName || provider.name}</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-white"><Icon name="close" /></button>
+        </div>
+        <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Hi, I'm interested in your services for my upcoming event..." rows={4} className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-sm text-white outline-none focus:border-violet-500 resize-none mb-4" />
+        <div className="flex justify-end gap-3">
+          <button onClick={onClose} className="rounded-2xl border border-white/10 px-5 py-3 text-xs font-black uppercase tracking-widest text-slate-300 hover:bg-white/5">Cancel</button>
+          <button disabled={!text.trim() || sending} onClick={handleSend} className="rounded-2xl bg-violet-600 px-5 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-violet-500 disabled:opacity-50">{sending ? "Sending..." : "Send Message"}</button>
+        </div>
+      </div>
+    </div>
   );
 }

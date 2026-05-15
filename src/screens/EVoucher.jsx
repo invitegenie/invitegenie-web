@@ -1,10 +1,13 @@
-﻿import { useState, useEffect } from "react";
+﻿﻿import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import * as Engine from "../auth/coreEngine";
 import { MOCK_BOOKINGS } from "./Bookings";
 import { getEventById as getDemoEventById } from "../services/mockData";
 import { getBookingById as getDemoBookingById, getTicketById as getDemoTicketById } from "../services/ticketingService";
+import { getActiveSponsorBranding, injectSponsorsIntoTicket } from "../services/eventSponsorBrandingService";
+import SponsorLogoStrip from "../components/SponsorLogoStrip";
+import VIPAccessBadge from "../components/VIPAccessBadge";
 
 export default function EVoucher() {
   const { bookingId } = useParams();
@@ -38,6 +41,8 @@ export default function EVoucher() {
           amount: mock.amount,
           price: mock.amount,
           qrValue: mock.voucher === "-" ? mock.id : mock.voucher,
+          accessLevel: "standard",
+          ticketStatus: "valid"
         });
         setEvent({
           title: mock.event,
@@ -72,6 +77,8 @@ export default function EVoucher() {
       alert("Link copied to clipboard!");
     }
   };
+
+  const sponsors = event ? injectSponsorsIntoTicket(ticket, getActiveSponsorBranding(event.id)) : [];
 
   if (!ticket || !event) {
     return (
@@ -127,7 +134,10 @@ export default function EVoucher() {
             />
             <div className="absolute inset-0 bg-gradient-to-t lg:bg-gradient-to-r from-black/80 via-transparent to-transparent" />
             <div className="absolute bottom-6 left-6 right-6 lg:bottom-10 lg:left-10">
-              <span className="px-3 py-1 rounded-full bg-violet-600 text-[9px] font-black uppercase tracking-widest text-white mb-2 inline-block">{ticket.type} Pass</span>
+              <div className="flex gap-2 mb-2">
+                <span className="px-3 py-1 rounded-full bg-violet-600 text-[9px] font-black uppercase tracking-widest text-white">{ticket.type || ticket.ticketType} Pass</span>
+                <VIPAccessBadge accessLevel={ticket.accessLevel} />
+              </div>
               <h1 className="text-2xl font-semibold text-white font-heading leading-tight">{ticket.eventName}</h1>
               <p className="text-gray-300 text-xs mt-1 font-medium flex items-center gap-1">
                 <span className="material-symbols-outlined text-[14px]">location_on</span>
@@ -167,14 +177,26 @@ export default function EVoucher() {
 
             <div className="mt-8 pt-8 border-t border-white/5 flex items-center justify-between">
                <div className="flex items-center gap-2">
-                 <span className="material-symbols-outlined text-emerald-400">check_circle</span>
-                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Booking Confirmed</span>
+                 {ticket.ticketStatus === "checked_in" ? (
+                   <>
+                     <span className="material-symbols-outlined text-violet-400">task_alt</span>
+                     <span className="text-[10px] font-black text-violet-300 uppercase tracking-widest">Scanned / Checked In</span>
+                   </>
+                 ) : (
+                   <>
+                     <span className="material-symbols-outlined text-emerald-400">check_circle</span>
+                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Valid Entry Pass</span>
+                   </>
+                 )}
                </div>
                <div className="flex items-center gap-2">
                  <span className="material-symbols-outlined text-violet-400">verified</span>
                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Secured by Invite Genie</span>
                </div>
             </div>
+            
+            <SponsorLogoStrip sponsors={sponsors} className="border-white/5" />
+            
           </div>
 
           {/* Right: QR Code */}

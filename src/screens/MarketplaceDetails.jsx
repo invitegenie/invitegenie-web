@@ -1,17 +1,41 @@
-﻿﻿import { useState } from "react";
+﻿﻿﻿﻿import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Layout from "../components/Layout";
 import { useAuth } from "../auth/AuthContext";
 import { addProviderRequest, getProviderById } from "../services/mockData";
 import * as Engine from "../auth/coreEngine";
+import { getStorefrontProducts, STOREFRONT_STORAGE_KEYS } from "../services/marketplaceStorefrontService";
+import AvailabilityBadge from "../components/AvailabilityBadge";
+import { calculateAvailabilityStatus } from "../services/availabilityService";
+import { sendMessage } from "../services/messagingService";
+
+function notificationId(prefix = "notif") {
+  return `${prefix}-${Date.now()}`;
+}
 
 export default function MarketplaceDetails() {
   const { providerId, listingId } = useParams();
   const navigate = useNavigate();
   const { currentUser, profile } = useAuth();
-  const listing = getProviderById(providerId || listingId);
+  
+  const mockListing = getProviderById(providerId || listingId);
+  const engineListing = (Engine.getCollection(Engine.KEYS.VENDORS) || []).find(v => String(v.id) === String(providerId || listingId));
+  const listing = mockListing || engineListing;
+
   const [activeTab, setActiveTab] = useState("overview");
   const [toast, setToast] = useState("");
+  const storefrontProducts = listing ? getStorefrontProducts(listing.id) : [];
+  const [availabilityStatus, setAvailabilityStatus] = useState('available');
+
+  useEffect(() => {
+    const loadAvailability = async () => {
+      if (listing?.id) {
+        const s = await calculateAvailabilityStatus(listing.id, new Date().toISOString().slice(0, 10));
+        setAvailabilityStatus(s);
+      }
+    };
+    loadAvailability();
+  }, [listing?.id]);
 
   if (!listing) {
     return (
@@ -46,7 +70,7 @@ export default function MarketplaceDetails() {
     const existingNotifs = Engine.getCollection(Engine.KEYS.NOTIFICATIONS) || [];
     Engine.save(Engine.KEYS.NOTIFICATIONS, [
       {
-        id: `notif-${Date.now()}`,
+        id: notificationId(),
         userId: listing.ownerId || listing.sellerId,
         type: "vendor",
         title: "New Quote Request",
@@ -72,6 +96,32 @@ export default function MarketplaceDetails() {
     navigate("/checkout");
   };
 
+  const bookStorefrontProduct = (product) => {
+    const ownerId = product.ownerId || listing.ownerId || listing.userId || listing.sellerId;
+    if (currentUser?.id && ownerId && String(currentUser.id) === String(ownerId)) {
+      showToast("You cannot book your own service.");
+      return;
+    }
+    localStorage.setItem(
+      STOREFRONT_STORAGE_KEYS.selectedItem,
+      JSON.stringify({
+        providerId: listing.id,
+        productId: product.id,
+        ownerId,
+        title: product.title,
+        category: product.category,
+        type: product.type,
+        price: product.price,
+        currency: product.currency,
+        duration: product.duration,
+        image: product.image,
+        description: product.description,
+        included: product.included,
+      })
+    );
+    navigate(`/marketplace/${listing.id}/book?product=${product.id}`);
+  };
+
   const shareListing = async () => {
     const url = `${window.location.origin}/marketplace/${listing.id}`;
     if (navigator.share) await navigator.share({ title: listing.title, text: listing.description, url });
@@ -94,6 +144,12 @@ export default function MarketplaceDetails() {
             <p className="mb-4 w-fit rounded-full bg-violet-600 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white">{listing.category}</p>
             <h1 className="max-w-4xl text-4xl font-black tracking-tight text-white sm:text-5xl">{listing.title}</h1>
             <p className="mt-3 text-lg font-semibold text-slate-200">{listing.businessName} - {listing.location}</p>
+            <div className="mt-2 flex items-center gap-4">
+              <AvailabilityBadge status={availabilityStatus} label={
+                availabilityStatus === 'available' ? 'Available Today' : availabilityStatus === 'almost_booked' ? 'Almost Booked' : 'Unavailable Today'
+              } />
+              <a href={`/marketplace/${listing.id}/availability`} className="text-violet-400 hover:underline text-xs font-bold">View Availability</a>
+            </div>
           </div>
         </section>
 
@@ -201,7 +257,8 @@ export default function MarketplaceDetails() {
             <img src={listing.qrCodeUrl} alt={`${listing.title} QR`} className="mx-auto mt-6 h-40 w-40 rounded-2xl bg-white p-3" />
             <div className="mt-6 space-y-3">
               <button onClick={requestQuote} className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-white/[0.08]">Request Quote</button>
-              <button onClick={() => startCheckout("booking")} className="w-full rounded-2xl bg-violet-600 px-5 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-violet-500">Book Service</button>
+              <button onClick={() => navigate(`/marketplace/${listing.id}/storefront`)} className="w-full rounded-2xl bg-gradient-to-r from-amber-300 to-orange-500 px-5 py-3 text-xs font-black uppercase tracking-widest text-slate-950 hover:opacity-90">View Storefront</button>
+              <button onClick={() => navigate(`/marketplace/${listing.id}/book`)} className="w-full rounded-2xl bg-violet-600 px-5 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-violet-500">Book Service</button>
               {["product", "item"].includes(String(listing.type).toLowerCase()) ? (
                 <button onClick={() => startCheckout("buy")} className="w-full rounded-2xl bg-emerald-500 px-5 py-3 text-xs font-black uppercase tracking-widest text-slate-950 hover:bg-emerald-400">Buy Item</button>
               ) : null}
@@ -210,6 +267,36 @@ export default function MarketplaceDetails() {
             </div>
           </aside>
         </div>
+
+        {activeTab === "overview" && storefrontProducts.length ? (
+          <section className="rounded-3xl border border-amber-500/20 bg-[#11100d] p-6 shadow-xl">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-amber-300">Storefront</p>
+                <h2 className="mt-2 text-2xl font-black text-white">Featured products and services</h2>
+              </div>
+              <button onClick={() => navigate(`/marketplace/${listing.id}/storefront`)} className="w-fit rounded-2xl border border-amber-400/30 px-5 py-3 text-xs font-black uppercase tracking-widest text-amber-100">
+                Open Full Storefront
+              </button>
+            </div>
+            <div className="mt-5 grid gap-4 md:grid-cols-3">
+              {storefrontProducts.slice(0, 3).map((product) => (
+                <article key={product.id} className="overflow-hidden rounded-3xl border border-white/10 bg-black/25">
+                  <img src={product.image} alt={product.title} className="h-40 w-full object-cover" />
+                  <div className="space-y-3 p-4">
+                    <span className="rounded-full bg-amber-300 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-black">{product.category}</span>
+                    <h3 className="line-clamp-2 text-lg font-black text-white">{product.title}</h3>
+                    <p className="text-sm font-black text-amber-300">FCFA {Number(product.price || 0).toLocaleString()}</p>
+                    <p className="line-clamp-2 text-sm leading-6 text-stone-400">{product.description}</p>
+                    <button onClick={() => bookStorefrontProduct(product)} className="w-full rounded-2xl bg-amber-300 px-4 py-3 text-xs font-black uppercase tracking-widest text-black">
+                      Book Now
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
       </div>
     </Layout>
   );

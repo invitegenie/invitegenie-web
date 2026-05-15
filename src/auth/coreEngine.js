@@ -17,6 +17,13 @@ import {
   MOCK_PAYMENTS,
   MOCK_PROVIDERS,
 } from "../services/mockData";
+import {
+  ALL_EVENT_STORAGE_KEYS,
+  EVENT_STORAGE_KEY,
+  readEventsFromStorage,
+  updateEventInStorage,
+  writeEventsToStorage,
+} from "../services/eventStoreService";
 
 // Optional Supabase integration (non-blocking if not available)
 let supabaseEngine = null;
@@ -41,7 +48,7 @@ loadSupabaseEngine();
 
 export const KEYS = {
   USERS: "ig_users",
-  EVENTS: "ig_events",
+  EVENTS: EVENT_STORAGE_KEY,
   TICKETS: "ig_tickets",
   PAYMENTS: "ig_payments",
   MEMORIES: "ig_memories",
@@ -92,21 +99,40 @@ const safeParse = (value, fallback = []) => {
 };
 
 const initDB = (key, initialData = []) => {
+  if (key === KEYS.EVENTS) {
+    readEventsFromStorage(initialData);
+    return;
+  }
   if (!localStorage.getItem(key)) {
     localStorage.setItem(key, JSON.stringify(initialData));
   }
 };
 
-const get = (key) => safeParse(localStorage.getItem(key), []);
+const get = (key) => {
+  if (key === KEYS.EVENTS) return readEventsFromStorage(MOCK_EVENTS);
+  return safeParse(localStorage.getItem(key), []);
+};
 
 export const save = (key, data) => {
+  if (key === KEYS.EVENTS) {
+    const events = writeEventsToStorage(data);
+    notify(key, events);
+    return events;
+  }
   localStorage.setItem(key, JSON.stringify(data));
   notify(key, data);
   window.dispatchEvent(new CustomEvent("invitegenie:data-change", { detail: { key, data } }));
   return data;
 };
 
-const makeId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const makeId = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, c =>
+    (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+  );
+};
 
 // =============================
 // SUPABASE HELPERS (Optional, Non-Breaking)
@@ -251,8 +277,6 @@ export const getEventById = async (id) => {
 };
 
 export const createEvent = async (eventData) => {
-  const events = await getEvents();
-
   const newEvent = {
     id: makeId("evt"),
     title: "Untitled Event",
@@ -282,16 +306,7 @@ export const createEvent = async (eventData) => {
 };
 
 export const updateEvent = async (id, data) => {
-  const events = await getEvents();
-
-  const updatedEvents = events.map((event) =>
-    String(event.id) === String(id)
-      ? { ...event, ...data, updatedAt: new Date().toISOString() }
-      : event
-  );
-
-  save(KEYS.EVENTS, updatedEvents);
-  return await getEventById(id);
+  return updateEventInStorage(id, data, MOCK_EVENTS) || (await getEventById(id));
 };
 
 export const deleteEvent = async (id) => {
@@ -381,8 +396,6 @@ export const validateTicket = (id) => {
 };
 
 export const createMockPayment = async (eventId, userId, amount, ticketId = null) => {
-  const payments = get(KEYS.PAYMENTS);
-
   const payment = {
     id: makeId("PAY"),
     eventId,
@@ -443,14 +456,15 @@ export const createPost = ({
   return post;
 };
 
-export const likePost = (postId, userId) => {
+export const likePost = async (postId, userId) => {
   const posts = getPosts();
+  let alreadyLiked = false;
 
   const updatedPosts = posts.map((post) => {
     if (String(post.id) !== String(postId)) return post;
 
     const likes = Array.isArray(post.likes) ? post.likes : [];
-    const alreadyLiked = likes.includes(userId);
+    alreadyLiked = likes.includes(userId);
 
     return {
       ...post,
@@ -461,6 +475,11 @@ export const likePost = (postId, userId) => {
   });
 
   save(KEYS.POSTS, updatedPosts);
+
+  if (supabaseEngine && isSupabaseReady() && supabaseEngine.togglePostLikeInSupabase) {
+    supabaseEngine.togglePostLikeInSupabase(postId, !alreadyLiked).catch(console.error);
+  }
+
   return getPostById(postId);
 };
 
@@ -469,9 +488,7 @@ export const getComments = () => get(KEYS.COMMENTS);
 export const getCommentsByPost = (postId) =>
   getComments().filter((comment) => String(comment.postId) === String(postId));
 
-export const createComment = ({ postId, userId, userName, text }) => {
-  const comments = getComments();
-
+export const createComment = async ({ postId, userId, userName, text }) => {
   const comment = {
     id: makeId("comment"),
     postId,
@@ -482,7 +499,7 @@ export const createComment = ({ postId, userId, userName, text }) => {
     timestamp: Date.now(),
   };
 
-  save(KEYS.COMMENTS, [...comments, comment]);
+  await createDataAsync(KEYS.COMMENTS, comment, supabaseEngine?.createCommentInSupabase);
 
   const posts = getPosts().map((post) =>
     String(post.id) === String(postId)
@@ -491,6 +508,10 @@ export const createComment = ({ postId, userId, userName, text }) => {
   );
 
   save(KEYS.POSTS, posts);
+  
+  if (supabaseEngine && isSupabaseReady() && supabaseEngine.incrementPostCommentCount) {
+    supabaseEngine.incrementPostCommentCount(postId).catch(console.error);
+  }
   return comment;
 };
 
@@ -539,8 +560,6 @@ export const getGlobalFeed = () => {
 export const getMemories = async (eventId = null) => await getDataAsync(KEYS.MEMORIES, () => supabaseEngine?.getMemoriesFromSupabase(eventId));
 
 export const createMemory = async ({ eventId, userId, caption, media, userName }) => {
-  const memories = await getMemories();
-
   const memory = {
     id: makeId("mem"),
     eventId,
@@ -569,14 +588,15 @@ export const createMemory = async ({ eventId, userId, caption, media, userName }
   return memory;
 };
 
-export const likeMemory = (memoryId, userId) => {
-  const memories = getMemories();
+export const likeMemory = async (memoryId, userId) => {
+  const memories = await getMemories();
+  let alreadyLiked = false;
 
   const updatedMemories = memories.map((memory) => {
     if (String(memory.id) !== String(memoryId)) return memory;
 
     const likes = Array.isArray(memory.likes) ? memory.likes : [];
-    const alreadyLiked = likes.includes(userId);
+    alreadyLiked = likes.includes(userId);
 
     return {
       ...memory,
@@ -587,6 +607,10 @@ export const likeMemory = (memoryId, userId) => {
   });
 
   save(KEYS.MEMORIES, updatedMemories);
+
+  if (supabaseEngine && isSupabaseReady() && supabaseEngine.toggleMemoryLikeInSupabase) {
+    supabaseEngine.toggleMemoryLikeInSupabase(memoryId, !alreadyLiked).catch(console.error);
+  }
 };
 
 // =============================
@@ -618,8 +642,6 @@ export const uploadGalleryImage = (eventId, imageData) => {
 // =============================
 
 export const createInvitation = async (data) => {
-  const invitations = get(KEYS.INVITATIONS);
-
   const invitation = {
     id: makeId("inv"),
     status: "draft",
@@ -669,9 +691,7 @@ export const getFreelancers = async (category = null) => await getDataAsync(KEYS
 export const getFreelancerById = (id) =>
   getFreelancers().then(freelancers => freelancers.find((freelancer) => String(freelancer.id) === String(id)));
 
-export const createFreelancer = (data) => {
-  const freelancers = getFreelancers();
-
+export const createFreelancer = async (data) => {
   const freelancer = {
     id: makeId("fre"),
     rating: 0,
@@ -683,7 +703,7 @@ export const createFreelancer = (data) => {
     ...data,
   };
 
-  save(KEYS.FREELANCERS, [freelancer, ...freelancers]);
+  await createDataAsync(KEYS.FREELANCERS, freelancer, supabaseEngine?.createFreelancerInSupabase);
   return freelancer;
 };
 
@@ -705,9 +725,7 @@ export const getGigs = async (freelancerId = null) => await getDataAsync(KEYS.GI
 export const getGigById = (id) =>
   getGigs().then(gigs => gigs.find((gig) => String(gig.id) === String(id)));
 
-export const createGig = (data) => {
-  const gigs = getGigs();
-
+export const createGig = async (data) => {
   const gig = {
     id: makeId("gig"),
     title: "Untitled Gig",
@@ -719,7 +737,7 @@ export const createGig = (data) => {
     ...data,
   };
 
-  save(KEYS.GIGS, [gig, ...gigs]);
+  await createDataAsync(KEYS.GIGS, gig, supabaseEngine?.createGigInSupabase);
 
   createPost({
     userId: gig.hostId || "system",
@@ -939,12 +957,10 @@ export const getMessagesBetweenUsers = (userA, userB) =>
  */
 export const seedDemoData = async () => {
   const superId = "demo-super";
-  const adminId = "demo-admin";
-  const userId = "demo-user";
 
   // 1. Clear Data first for a clean restore
   localStorage.removeItem(KEYS.FREELANCERS);
-  localStorage.removeItem(KEYS.EVENTS);
+  ALL_EVENT_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
   localStorage.removeItem(KEYS.TICKETS);
   localStorage.removeItem(KEYS.PAYMENTS);
   localStorage.removeItem(KEYS.MEMORIES);

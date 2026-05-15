@@ -1,24 +1,23 @@
 import { useNavigate } from "react-router-dom";
-import { useState, useMemo, useEffect } from "react";
-import * as Engine from "../../auth/coreEngine";
+import { useMemo } from "react";
 import { KEYS } from "../../auth/coreEngine";
 import { useAuth } from "../../auth/AuthContext";
-import { USER_ROLES } from "../../auth/roles";
+import { USER_ROLES } from "../../services/roles";
 import useEngineCollection from "../useEngineCollection";
 
 export default function RoleDashboard() {
   const navigate = useNavigate();
   const { currentUser, role } = useAuth();
 
-  const events = useEngineCollection(KEYS.EVENTS) || [];
+  const events = useEngineCollection(KEYS.EVENTS);
   const memories = useEngineCollection(KEYS.MEMORIES) || [];
-  const tickets = useEngineCollection(KEYS.TICKETS) || [];
+  const tickets = useEngineCollection(KEYS.TICKETS);
 
   const myTickets = useMemo(() => 
-    tickets.filter(t => t.userId === currentUser?.id || t.userId === 'user-pro-001'), [tickets, currentUser]);
+    (tickets || []).filter(t => t.userId === currentUser?.id || t.userId === 'user-pro-001'), [tickets, currentUser]);
 
   const myEvents = useMemo(() => 
-    events.filter(e => e.hostId === currentUser?.id || e.hostId === 'user-pro-001'), [events, currentUser]);
+    (events || []).filter(e => e.hostId === currentUser?.id || e.hostId === 'user-pro-001'), [events, currentUser]);
 
   return (
     <div className="space-y-10 animate-in fade-in duration-700">
@@ -46,7 +45,7 @@ export default function RoleDashboard() {
       {/* 2. Role Specific Content */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-8 space-y-8">
-          {role === USER_ROLES.BASIC_USER && (
+          {role === USER_ROLES.NORMAL_USER && (
             <DashboardCard title="My Active Tickets" icon="confirmation_number">
               {myTickets.length > 0 ? (
                  <div className="space-y-4">
@@ -66,7 +65,7 @@ export default function RoleDashboard() {
             </DashboardCard>
           )}
 
-          {role === USER_ROLES.EVENT_HOST && (
+          {role === USER_ROLES.EVENT_PLANNER && (
             <DashboardCard title="My Hosted Events" icon="event">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {myEvents.map(ev => (
@@ -93,7 +92,7 @@ export default function RoleDashboard() {
                 {/* Use the 'memories' variable from useEngineCollection hook instead of calling the async function */}
                 {memories && memories.length > 0 ? memories.slice(0, 3).map(mem => (
                   <div key={mem.id} className="flex gap-4">
-                    <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0"><img src={mem.image} className="w-full h-full object-cover" /></div>
+                    <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0"><img src={mem.image} alt={mem.caption || "Event memory"} className="w-full h-full object-cover" /></div>
                     <p className="text-[10px] text-gray-300 italic line-clamp-2">"{mem.caption}"</p>
                   </div>
                 )) : (

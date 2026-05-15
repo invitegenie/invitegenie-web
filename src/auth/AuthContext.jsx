@@ -11,6 +11,7 @@ import {
   normalizeRole,
   USER_ROLES,
 } from "../services/roles";
+import { ACCOUNT_TYPES, buildUnifiedUser, normalizeAccountType } from "../services/accountCapabilities";
 
 const AUTH_STORAGE_KEY = "invitegenie_auth";
 const PROFILE_STORAGE_KEY = "invitegenie_profile";
@@ -28,20 +29,21 @@ function readStoredJson(key) {
 }
 
 function roleToTier(role) {
-  if (role === USER_ROLES.SUPER_ADMIN) return "GOD_MODE";
+  if (role === USER_ROLES.SUPER_ADMIN) return ACCOUNT_TYPES.ENTERPRISE;
   if (ADMIN_ROLES.includes(role)) return "ADMIN";
-  if ([USER_ROLES.PRO_USER, USER_ROLES.EVENT_PLANNER, USER_ROLES.ENTERPRISE_CLIENT].includes(role)) return "PRO";
-  if ([USER_ROLES.VENDOR, USER_ROLES.TASKER].includes(role)) return "BUSINESS";
-  if (role === USER_ROLES.CHECKIN_AGENT) return "STAFF";
-  return "BASIC";
+  return normalizeAccountType(role);
 }
 
 function normalizeProfile(authUser, profileData = {}) {
-  const role = normalizeRole(
+  const legacyRole =
+    profileData.legacyRole ||
+    profileData.legacy_role ||
     profileData.role ||
-      profileData.admin_role ||
-      authUser?.user_metadata?.role ||
-      (USER_ROLES?.BASIC_USER || "normal_user")
+    profileData.admin_role ||
+    authUser?.user_metadata?.role ||
+    USER_ROLES.FREE;
+  const role = normalizeRole(
+    legacyRole
   );
   const fullName =
     profileData.full_name ||
@@ -51,23 +53,26 @@ function normalizeProfile(authUser, profileData = {}) {
     authUser?.email?.split("@")[0] ||
     "InviteGenie User";
 
-  const baseProfile = {
+  const baseProfile = buildUnifiedUser({
     id: profileData.id || authUser?.id,
     email: profileData.email || authUser?.email || "",
     full_name: fullName,
     phone: profileData.phone || authUser?.phone || "",
     role,
+    legacyRole,
     admin_role: profileData.admin_role || (isAdminRole(role) ? role : null),
     permissions: profileData.permissions || [],
-    accountType: profileData.accountType || profileData.account_type || profileData.plan || role,
-    plan: profileData.plan || profileData.accountType || profileData.account_type || roleToTier(role),
+    accountType: normalizeAccountType(profileData.accountType || profileData.account_type || profileData.plan || legacyRole || role),
+    billingCycle: profileData.billingCycle || profileData.billing_cycle || "monthly",
+    capabilities: profileData.capabilities || {},
+    plan: normalizeAccountType(profileData.plan || profileData.accountType || profileData.account_type || legacyRole || role),
     status: profileData.status || "active",
     tier: profileData.tier || roleToTier(role),
     avatar: profileData.avatar || fullName.slice(0, 2).toUpperCase(),
     city: profileData.city || "",
     country: profileData.country || "",
     createdAt: profileData.createdAt || profileData.created_at || new Date().toISOString(),
-  };
+  });
 
   return {
     ...baseProfile,
@@ -80,8 +85,9 @@ function toCurrentUser(profile) {
   return {
     ...profile,
     name: profile.full_name,
-    plan: profile.plan || (profile.tier === "PRO" ? "Pro Account" : profile.tier === "ADMIN" ? "Admin Console" : profile.tier),
+    plan: profile.plan || profile.accountType || profile.tier,
     accountType: profile.accountType || profile.role,
+    capabilities: profile.capabilities,
   };
 }
 
@@ -128,11 +134,6 @@ async function fetchSupabaseProfile(authUser) {
   }
 
   return normalizeProfile(authUser, data || {});
-}
-
-function shouldAllowDemoAuth() {
-  // DEMO ONLY - replace with Supabase Auth before production.
-  return import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_AUTH === "true" || !isSupabaseConfigured();
 }
 
 export function AuthProvider({ children }) {
@@ -196,9 +197,20 @@ export function AuthProvider({ children }) {
 
         // Prioritize real Supabase session over demo localStorage
         if (supabase && isSupabaseConfigured()) {
-          const { data } = await supabase.auth.getSession();
-          if (data?.session?.user) {
+          const { data, error } = await supabase.auth.getSession();
+          
+          if (error) {
+            console.warn("Supabase getSession error:", error.message);
+            // If it's a network error, do NOT clear the session. Fall through to local storage.
+            if (error.message !== "Failed to fetch" && !error.message.toLowerCase().includes("network")) {
+              clearSession();
+              return;
+            }
+          } else if (data?.session?.user) {
             await hydrateFromAuthUser(data.session.user);
+            return;
+          } else if (!storedUser || !storedProfile) {
+            clearSession();
             return;
           }
         }
@@ -212,11 +224,13 @@ export function AuthProvider({ children }) {
             user_metadata: { full_name: storedProfile.full_name, role: storedProfile.role },
           });
           setProfile(normalizeProfile(storedUser, storedProfile));
-          // Ensure the core engine is aware of the hydrated user
           Engine.setCurrentUser?.(storedUser);
         } else {
           clearSession();
         }
+      } catch (e) {
+        console.error("Session load error:", e);
+        clearSession();
       } finally {
         if (mounted) setLoading(false);
       }
@@ -248,25 +262,47 @@ export function AuthProvider({ children }) {
   const signIn = useCallback(
     async (email, password, options = {}) => {
       const portal = options?.portal || "any";
-      // TEMPORARY: Professional Demo Account Logic
-      let demoAccount = null;
-      if (shouldAllowDemoAuth()) {
-        demoAccount = findDemoAccount(email, password);
+      
+      const demoAccount = findDemoAccount(email, password);
+
+      if (supabase && isSupabaseConfigured()) {
+        try {
+          const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+          if (error) throw error;
+
+          sessionStorage.removeItem(SUPER_ADMIN_2FA_KEY);
+          const result = await hydrateFromAuthUser(data.user);
+          
+          if (portal === "user" && isAdminRole(result.role)) {
+            clearSession();
+            throw new Error("Admin accounts must use the admin console.");
+          }
+          if (portal === "admin" && !isAdminRole(result.role)) {
+            clearSession();
+            throw new Error("This account is not authorized for admin access.");
+          }
+          return result;
+        } catch (error) {
+          const message = error?.message || "";
+          // Beta/demo accounts should keep working even when Supabase is configured
+          // but those demo users have not been provisioned in the remote auth project.
+          if (!demoAccount && message !== "Failed to fetch" && !message.toLowerCase().includes("network")) {
+            throw error;
+          }
+          console.warn("Offline mode: falling back to demo login.");
+        }
       }
 
       if (demoAccount) {
         if (portal === "user" && isAdminRole(demoAccount.role)) {
           throw new Error("Admin accounts must use the admin console.");
         }
-
         if (portal === "admin" && !isAdminRole(demoAccount.role)) {
           throw new Error("This account is not authorized for admin access.");
         }
 
         const demoSession = toDemoSession(demoAccount);
 
-        // For Super Admin, we don't clear the 2FA key here yet,
-        // the AdminProtectedRoute will check for the verified flag in sessionStorage
         if (demoAccount.role !== USER_ROLES.SUPER_ADMIN) {
            sessionStorage.setItem(SUPER_ADMIN_2FA_KEY, "true");
         } else {
@@ -277,31 +313,22 @@ export function AuthProvider({ children }) {
         return { ...demoSession, role: demoSession.profile.role, isDemo: true };
       }
 
-      if (!supabase) {
-        throw new Error("Invalid demo credentials. Supabase Auth is not configured yet.");
+      if (supabase && isSupabaseConfigured()) {
+        throw new Error("Network error. Unable to reach authentication server.");
+      } else {
+        throw new Error("Invalid demo credentials. Check your email and password.");
       }
-
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-
-      sessionStorage.removeItem(SUPER_ADMIN_2FA_KEY);
-      const result = await hydrateFromAuthUser(data.user);
-      if (portal === "user" && isAdminRole(result.role)) {
-        clearSession();
-        throw new Error("Admin accounts must use the admin console.");
-      }
-      if (portal === "admin" && !isAdminRole(result.role)) {
-        clearSession();
-        throw new Error("This account is not authorized for admin access.");
-      }
-      return result;
     },
     [clearSession, hydrateFromAuthUser, persistSession]
   );
 
   const signOut = useCallback(async () => {
     if (supabase) {
-      await supabase.auth.signOut();
+      try {
+        await supabase.auth.signOut();
+      } catch (error) {
+        console.warn("Supabase signOut failed; clearing local session.", error?.message || error);
+      }
     }
     clearSession();
   }, [clearSession]);
@@ -318,26 +345,35 @@ export function AuthProvider({ children }) {
 
   const signup = useCallback(
     async (email, password, fullName) => {
-      if (supabase) {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: fullName,
-              role: USER_ROLES.BASIC_USER,
+      if (supabase && isSupabaseConfigured()) {
+        try {
+          const { data, error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              data: {
+                full_name: fullName,
+                role: USER_ROLES.BASIC_USER,
+              },
             },
-          },
-        });
-        if (error) throw error;
-        return data;
+          });
+          if (error) throw error;
+          return data;
+        } catch (error) {
+          if (error.message !== "Failed to fetch" && !error.message.toLowerCase().includes("network")) {
+            throw error;
+          }
+          console.warn("Offline mode: falling back to demo signup.");
+        }
       }
 
       const demoSession = toDemoSession({
-        ...DEMO_ACCOUNTS.find((account) => account.role === USER_ROLES.BASIC_USER),
+        ...(DEMO_ACCOUNTS.find((account) => normalizeRole(account.role) === USER_ROLES.FREE) || {}),
         id: `demo-${Date.now()}`,
         email,
         full_name: fullName || email,
+        role: USER_ROLES.FREE,
+        accountType: ACCOUNT_TYPES.FREE,
       });
       persistSession(demoSession.user, demoSession.profile);
       return demoSession.user;

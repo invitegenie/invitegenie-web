@@ -1,11 +1,46 @@
 ﻿import { useState } from "react";
 import Layout from "../components/Layout";
 import PageTitle from "../components/PageTitle";
+import FeatureBadge from "../components/FeatureBadge";
 import { useAuth } from "../auth/AuthContext";
 import { DEMO_ACCOUNTS } from "../services/roles";
+import {
+  getAccountType,
+  getEffectiveCapabilities,
+  getPlanLimits,
+  normalizeCapabilities,
+  saveTaskerProfile,
+  updateUserCapabilities,
+} from "../services/accountCapabilities";
+
+const PLAN_DEMO_ACCOUNT_IDS = ["normal-marie", "pro-estelle", "vendor-brice", "enterprise-mtn"];
+
+function CapabilityToggle({ title, description, checked, onChange }) {
+  return (
+    <button
+      type="button"
+      onClick={onChange}
+      className={`rounded-2xl border p-4 text-left transition ${
+        checked ? "border-amber-300/35 bg-amber-300/10" : "border-white/10 bg-white/[0.035] hover:bg-white/[0.055]"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="font-black text-white">{title}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-400">{description}</p>
+        </div>
+        <span className={`mt-1 h-6 w-11 rounded-full p-1 transition ${checked ? "bg-emerald-400" : "bg-slate-700"}`}>
+          <span className={`block h-4 w-4 rounded-full bg-white transition ${checked ? "translate-x-5" : ""}`} />
+        </span>
+      </div>
+    </button>
+  );
+}
 
 export default function Settings() {
   const { currentUser, setUser } = useAuth();
+  const [capabilityDraft, setCapabilityDraft] = useState(() => normalizeCapabilities(currentUser || {}));
+  const planDemoAccounts = DEMO_ACCOUNTS.filter((user) => PLAN_DEMO_ACCOUNT_IDS.includes(user.id));
   const [settings, setSettings] = useState({
     emailNotifications: true,
     smsNotifications: false,
@@ -28,14 +63,40 @@ export default function Settings() {
     alert("Settings saved successfully!");
   };
 
+  const handleCapabilityToggle = (key) => {
+    const nextCapabilities = updateUserCapabilities(currentUser, {
+      ...capabilityDraft,
+      [key]: !capabilityDraft[key],
+    });
+    if (!nextCapabilities) return;
+
+    setCapabilityDraft(nextCapabilities);
+    const nextUser = setUser({ ...currentUser, capabilities: nextCapabilities });
+    if (key === "taskerMode" && nextCapabilities.taskerMode) {
+      saveTaskerProfile({
+        userId: currentUser.id,
+        active: true,
+        skills: ["event staff", "usher", "check-in staff"],
+        availability: "Flexible",
+        verificationStatus: getAccountType(nextUser || currentUser) === "FREE" ? "basic" : "verified",
+        preferredLocations: [currentUser.city || "Douala"].filter(Boolean),
+      });
+    }
+  };
+
   const handleDemoUserChange = (userId) => {
     const nextUser = DEMO_ACCOUNTS.find((user) => user.id === userId);
     if (!nextUser) return;
     setUser({
       ...nextUser,
-      plan: `${nextUser.tier || "Demo"} Account`,
+      plan: nextUser.accountType || "FREE",
     });
+    setCapabilityDraft(normalizeCapabilities(nextUser));
   };
+
+  const accountType = getAccountType(currentUser);
+  const effectiveCapabilities = getEffectiveCapabilities({ ...currentUser, capabilities: capabilityDraft });
+  const limits = getPlanLimits(accountType);
 
   return (
     <Layout>
@@ -46,21 +107,71 @@ export default function Settings() {
         />
 
         <section className="rounded-3xl border border-white/10 bg-slate-900/60 p-6 shadow-xl backdrop-blur-xl">
-          <h3 className="text-xl font-bold text-white mb-2">Switch Demo Account</h3>
+          <h3 className="text-xl font-bold text-white mb-2">Switch Plan Demo</h3>
           <p className="mb-5 text-sm text-slate-400">
-            Use this selector to test marketplace, event, finance, and admin navigation by role.
+            Test the four SaaS account plans. Vendor, planner, tasker, and check-in access are controlled by the capability toggles below.
           </p>
           <select
             value={currentUser?.id || ""}
             onChange={(event) => handleDemoUserChange(event.target.value)}
             className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none focus:border-violet-400/50"
           >
-            {DEMO_ACCOUNTS.map((user) => (
+            {planDemoAccounts.map((user) => (
               <option key={user.id} value={user.id}>
-                {user.full_name} - {user.role}
+                {getAccountType(user)} - {user.full_name}
               </option>
             ))}
           </select>
+        </section>
+
+        <section className="rounded-3xl border border-amber-300/15 bg-slate-900/60 p-6 shadow-xl backdrop-blur-xl">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-amber-300">Unified Account</p>
+              <h3 className="mt-2 text-2xl font-black text-white">{accountType} Plan</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-400">
+                Activate marketplace, staffing, planning, and check-in capabilities without changing account type.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <FeatureBadge label={`${limits.unlimitedEverything ? "Unlimited" : limits.maxEvents} events`} tone="amber" />
+              <FeatureBadge label={`${limits.unlimitedEverything ? "Unlimited" : limits.maxGuestsPerEvent.toLocaleString()} guests/event`} tone="emerald" />
+              <FeatureBadge label={`${limits.unlimitedServices ? "Unlimited" : limits.maxServices} services`} tone="violet" />
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            <CapabilityToggle
+              title="Vendor Mode"
+              description="Sell services, publish a storefront, receive bookings, and join the marketplace."
+              checked={Boolean(capabilityDraft.vendorMode)}
+              onChange={() => handleCapabilityToggle("vendorMode")}
+            />
+            <CapabilityToggle
+              title="Planner Mode"
+              description="Create events, manage guests, publish RSVP pages, and use event tools."
+              checked={Boolean(capabilityDraft.plannerMode)}
+              onChange={() => handleCapabilityToggle("plannerMode")}
+            />
+            <CapabilityToggle
+              title="Tasker Availability"
+              description="Become visible for event staffing jobs like usher, waiter, helper, or assistant."
+              checked={Boolean(capabilityDraft.taskerMode)}
+              onChange={() => handleCapabilityToggle("taskerMode")}
+            />
+            <CapabilityToggle
+              title="Check-In Capability"
+              description="Scan QR codes, validate passes, and help manage guest arrivals."
+              checked={Boolean(capabilityDraft.checkInMode)}
+              onChange={() => handleCapabilityToggle("checkInMode")}
+            />
+          </div>
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            <FeatureBadge label={effectiveCapabilities.hasPriorityVisibility ? "Priority visibility" : "Basic visibility"} active={effectiveCapabilities.hasPriorityVisibility} />
+            <FeatureBadge label={effectiveCapabilities.hasVerifiedBadge ? "Verified badge" : "Basic badge"} active={effectiveCapabilities.hasVerifiedBadge} tone="amber" />
+            <FeatureBadge label={effectiveCapabilities.hasAnalytics ? "Analytics enabled" : "Basic analytics"} active={effectiveCapabilities.hasAnalytics} tone="emerald" />
+          </div>
         </section>
 
         {/* Notifications */}

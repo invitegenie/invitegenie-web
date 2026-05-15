@@ -6,14 +6,16 @@ import FloatingGenieButton from "./FloatingGenieButton";
 import { useAuth } from "../auth/AuthContext";
 import Header from "./Header";
 import Icon from "./Icon";
+import { hasAnyPermission } from "../services/roles";
 
 export default function Layout({ children, showHeader = true }) {
-  const { currentUser } = useAuth();
+  const { currentUser, profile, role } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const showBackButton = !["/dashboard", "/home"].includes(location.pathname);
+  const canCreateMarketplace = hasAnyPermission(profile || role, ["create_marketplace_listing", "create_marketplace_product", "manage_all_storefronts"]);
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
   const toggleCollapse = () => setIsSidebarCollapsed(!isSidebarCollapsed);
@@ -45,20 +47,49 @@ export default function Layout({ children, showHeader = true }) {
         
         {/* Main Content Viewport */}
         <div className="flex-1 flex flex-col min-w-0 max-w-full">
-          <main className={`p-4 sm:p-6 xl:p-8 space-y-6 min-h-screen pb-32 xl:pb-8 transition-all`}>
+          <main className={`p-4 sm:p-6 xl:p-8 space-y-6 min-h-screen pb-28 xl:pb-8 transition-all`}>
             {/* Mobile Header (Hidden on Desktop) */}
-            <div className="xl:hidden flex items-center justify-between mb-2 p-2 gap-4">
-              <span className="font-black text-xl bg-gradient-to-r from-[#8B5CF6] to-[#22C55E] bg-clip-text text-transparent tracking-tighter shrink-0">GENIE</span>
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={() => navigate("/marketplace/new")}
-                  className="p-2 bg-gradient-to-tr from-[#8B5CF6] to-[#22C55E] text-white rounded-xl shadow-lg"
-                >
-                  <Icon name="add_business" className="text-xl" />
-                </button>
-                <button onClick={toggleSidebar} className="p-2 bg-[#111827] border border-[#2A3342] rounded-xl">
-                  <Icon name="menu" />
-                </button>
+            <div className="sticky top-0 z-[90] -mx-4 -mt-4 mb-3 border-b border-white/10 bg-[#0B0F19]/95 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:-mt-6 sm:px-6 xl:hidden">
+              <div className="flex h-11 items-center justify-between gap-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={toggleSidebar}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-slate-100 transition hover:bg-white/10 hover:text-white"
+                    aria-label="Open navigation menu"
+                  >
+                    <Icon name="menu" className="text-[28px]" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/dashboard")}
+                    className="min-w-0 truncate text-left text-xl font-black tracking-tight bg-gradient-to-r from-[#8B5CF6] to-[#22C55E] bg-clip-text text-transparent drop-shadow-sm"
+                    style={{ WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}
+                  >
+                    InviteGenie
+                  </button>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {canCreateMarketplace ? (
+                    <button
+                      type="button"
+                      onClick={() => navigate("/marketplace/new")}
+                      className="flex h-10 w-10 items-center justify-center rounded-full text-slate-200 transition hover:bg-white/10 hover:text-white"
+                      aria-label="Create listing"
+                    >
+                      <Icon name="add_box" className="text-[25px]" />
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => navigate("/notifications")}
+                    className="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-200 transition hover:bg-white/10 hover:text-white"
+                    aria-label="Notifications"
+                  >
+                    <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-[#E1306C]" />
+                    <Icon name="favorite" className="text-[25px]" />
+                  </button>
+                </div>
               </div>
             </div>
 

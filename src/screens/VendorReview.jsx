@@ -4,12 +4,15 @@ import Layout from "../components/Layout";
 import { useAuth } from "../auth/AuthContext";
 import { getProviderById } from "../services/mockData";
 import Icon from "../components/Icon";
+import * as Engine from "../auth/coreEngine";
 
 export default function VendorReview() {
   const { providerId } = useParams();
   const navigate = useNavigate();
   const { currentUser } = useAuth();
-  const listing = getProviderById(providerId);
+  const mockListing = getProviderById(providerId);
+  const engineListing = (Engine.getCollection(Engine.KEYS.VENDORS) || []).find(v => String(v.id) === String(providerId));
+  const listing = mockListing || engineListing;
   
   const [rating, setRating] = useState(5);
   const [hoverRating, setHoverRating] = useState(0);
@@ -42,10 +45,14 @@ export default function VendorReview() {
       };
       
       // Save to local storage (demo)
-      const existing = JSON.parse(localStorage.getItem("demo_vendor_reviews") || "{}");
-      const listingReviews = existing[providerId] || [];
-      existing[providerId] = [newReview, ...listingReviews];
-      localStorage.setItem("demo_vendor_reviews", JSON.stringify(existing));
+      try {
+        const existing = JSON.parse(localStorage.getItem("demo_vendor_reviews") || "{}");
+        const listingReviews = existing[providerId] || [];
+        existing[providerId] = [newReview, ...listingReviews];
+        localStorage.setItem("demo_vendor_reviews", JSON.stringify(existing));
+      } catch (e) {
+        localStorage.setItem("demo_vendor_reviews", JSON.stringify({ [providerId]: [newReview] }));
+      }
       
       setSubmitting(false);
       alert("Review submitted successfully!");

@@ -1,6 +1,8 @@
-﻿import { useState } from "react";
+﻿﻿import { useState } from "react";
 import Layout from "../components/Layout";
 import PageTitle from "../components/PageTitle";
+
+const STORAGE_KEY = "invitegenie_integrations";
 
 const availableIntegrations = [
   {
@@ -31,17 +33,40 @@ const availableIntegrations = [
     icon: "âš™ï¸",
     connected: false,
   },
+  {
+    id: 5,
+    name: "Google Drive",
+    description: "Back up event memories automatically",
+    icon: "☁️",
+    connected: false,
+  },
 ];
 
 export default function Integrations() {
-  const [integrations, setIntegrations] = useState(availableIntegrations);
+  const [integrations, setIntegrations] = useState(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      return stored ? JSON.parse(stored) : availableIntegrations;
+    } catch {
+      return availableIntegrations;
+    }
+  });
 
   const toggleIntegration = (id) => {
-    setIntegrations((prev) =>
-      prev.map((int) =>
-        int.id === id ? { ...int, connected: !int.connected } : int
-      )
-    );
+    setIntegrations((prev) => {
+      const next = prev.map((int) => {
+        if (int.id === id) {
+          const nextState = !int.connected;
+          if (nextState && int.name === "Google Drive") {
+            alert("Google Drive connected! Your event memories will now be backed up automatically.");
+          }
+          return { ...int, connected: nextState };
+        }
+        return int;
+      });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
   };
 
   return (

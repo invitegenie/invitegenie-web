@@ -10,10 +10,10 @@ const ADMIN_NAV_ITEMS = [
   { label: "Permissions", path: "/admin/permissions", icon: "key", permission: "assign_permissions" },
   { label: "Feed Moderation", path: "/admin/feed", icon: "dynamic_feed", permission: "moderate_feed" },
   {
-    label: "Marketplace Approvals",
+    label: "Storefront Moderation",
     path: "/admin/marketplace",
     icon: "storefront",
-    permission: "approve_marketplace_listings",
+    permission: "moderate_storefronts",
   },
   { label: "Events", path: "/admin/events", icon: "event_available", permission: "view_all_events" },
   { label: "Financials", path: "/admin/financials", icon: "payments", permission: "view_all_financials" },

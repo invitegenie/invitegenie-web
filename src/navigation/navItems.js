@@ -22,7 +22,7 @@ export const NAV_ITEMS = [
   
   // Business
   { label: "Vendor Insights", path: "/vendor-insights", icon: "insights", category: "business", requiredPermission: ["view_vendor_insights", "advanced_vendor_insights"] },
-  { label: "Vendor Genie", path: "/vendor-genie", icon: "auto_awesome", category: "business", requiredPermission: ["use_vendor_genie", "manage_ai_vendor_tools"] },
+  { label: "AI Marketing Studio", path: "/ai-marketing-studio", icon: "campaign", category: "business", requiredPermission: "use_ai_marketing_studio", activePaths: ["/vendor-genie"] },
   { label: "Withdrawals", path: "/withdrawals", icon: "account_balance", category: "business", requiredPermission: ["view_own_withdrawals", "view_company_withdrawals", "view_withdrawals", "manage_payouts"] },
   { label: "Payments", path: "/payments", icon: "payments", category: "business", requiredPermission: "view_financials", minTier: "PRO" },
   { label: "Payment Methods", path: "/payment-methods", icon: "credit_card", category: "business", requiredPermission: "manage_profile" },
@@ -40,6 +40,7 @@ export const NAV_ITEMS = [
   { label: "Users Management", path: "/users-management", icon: "group", category: "admin", requiredPermission: "manage_users", minTier: "GOD_MODE" },
   { label: "Vendor Management", path: "/admin/vendors", icon: "store", category: "admin", requiredPermission: "manage_vendors", minTier: "GOD_MODE" },
   { label: "Events Management", path: "/events-management", icon: "event_available", category: "admin", requiredPermission: "manage_events", minTier: "GOD_MODE" },
+  { label: "Storefront Moderation", path: "/admin/marketplace", icon: "storefront", category: "admin", requiredPermission: "moderate_storefronts", minTier: "GOD_MODE" },
   { label: "Vendors Management", path: "/vendors-management", icon: "store", category: "admin", requiredPermission: "moderate_marketplace", minTier: "GOD_MODE" },
   { label: "Finance Management", path: "/finance-management", icon: "account_balance_wallet", category: "admin", requiredPermission: "view_financials", minTier: "GOD_MODE" },
   { label: "Content Moderation", path: "/content-moderation", icon: "shield", category: "admin", requiredPermission: "moderate_content", minTier: "GOD_MODE" },

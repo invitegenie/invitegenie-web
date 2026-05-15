@@ -1,14 +1,22 @@
 import React, { useState } from "react";
 import Layout from "../components/Layout";
 import Icon from "../components/Icon";
+import { getSponsors } from "../services/eventSponsorService";
+import { getEventById } from "../services/mockData";
+import { getSponsorAnalytics } from "../services/eventSponsorBrandingService";
+import { useAuth } from "../auth/AuthContext";
 
 export default function VendorInsights() {
+  const { currentUser } = useAuth();
   const [range, setRange] = useState("Last 30 Days");
+  const [activeTab, setActiveTab] = useState("Overview");
 
   const handleExport = (type) => {
     if (type === 'pdf') window.print();
     else alert("CSV export initiated.");
   };
+  
+  const mySponsorships = getSponsors().filter(s => String(s.sponsorUserId) === String(currentUser?.id) && s.status === "approved");
 
   return (
     <Layout>
@@ -31,69 +39,125 @@ export default function VendorInsights() {
             ))}
           </div>
         </header>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard label="Total Revenue" value="FCFA 12,450,000" trend="+15%" positive icon="payments" color="text-emerald-400" bg="bg-emerald-400/10" />
-          <StatCard label="Bookings" value="48" trend="+8" positive icon="event_available" color="text-violet-400" bg="bg-violet-400/10" />
-          <StatCard label="Profile Views" value="312" trend="+45" positive icon="visibility" color="text-blue-400" bg="bg-blue-400/10" />
-          <StatCard label="Conversion Rate" value="15.2%" trend="+2.1%" positive icon="trending_up" color="text-amber-400" bg="bg-amber-400/10" />
+        
+        <div className="flex gap-2 border-b border-white/10 pb-4">
+          {["Overview", "Sponsored Events"].map(tab => (
+            <button 
+              key={tab} 
+              onClick={() => setActiveTab(tab)}
+              className={`px-6 py-2.5 rounded-full text-xs font-black uppercase tracking-widest transition-colors ${activeTab === tab ? "bg-violet-600 text-white shadow-md" : "bg-[#111827] border border-white/10 text-slate-400 hover:text-white"}`}
+            >
+              {tab}
+            </button>
+          ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-[#111827] border border-white/10 rounded-3xl p-6 shadow-xl">
-            <h3 className="text-sm font-bold text-white uppercase tracking-widest mb-6">Revenue Trend</h3>
-            <div className="h-64 flex items-end gap-2">
-              {/* Dummy Chart */}
-              {[40, 70, 45, 90, 65, 100, 80].map((h, i) => (
-                <div key={i} className="flex-1 bg-violet-600/20 rounded-t-lg relative group hover:bg-violet-600/40 transition-colors" style={{ height: `${h}%` }}>
-                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity text-white">FCFA {h*10}k</div>
+        {activeTab === "Overview" && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard label="Total Revenue" value="FCFA 12,450,000" trend="+15%" positive icon="payments" color="text-emerald-400" bg="bg-emerald-400/10" />
+              <StatCard label="Bookings" value="48" trend="+8" positive icon="event_available" color="text-violet-400" bg="bg-violet-400/10" />
+              <StatCard label="Profile Views" value="312" trend="+45" positive icon="visibility" color="text-blue-400" bg="bg-blue-400/10" />
+              <StatCard label="Conversion Rate" value="15.2%" trend="+2.1%" positive icon="trending_up" color="text-amber-400" bg="bg-amber-400/10" />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-[#111827] border border-white/10 rounded-3xl p-6 shadow-xl">
+                <h3 className="text-sm font-bold text-white uppercase tracking-widest mb-6">Revenue Trend</h3>
+                <div className="h-64 flex items-end gap-2">
+                  {/* Dummy Chart */}
+                  {[40, 70, 45, 90, 65, 100, 80].map((h, i) => (
+                    <div key={i} className="flex-1 bg-violet-600/20 rounded-t-lg relative group hover:bg-violet-600/40 transition-colors" style={{ height: `${h}%` }}>
+                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity text-white">FCFA {h*10}k</div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <div className="flex justify-between mt-4 text-[10px] text-slate-500 font-bold uppercase">
-              <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
-            </div>
-          </div>
-
-          <div className="bg-[#111827] border border-white/10 rounded-3xl p-6 shadow-xl">
-            <h3 className="text-sm font-bold text-white uppercase tracking-widest mb-6">Customer Satisfaction</h3>
-            <div className="flex items-center gap-8 mb-8">
-              <div className="text-center">
-                <p className="text-5xl font-black text-white">4.8</p>
-                <div className="flex text-amber-400 my-2">
-                  <Icon name="star" /><Icon name="star" /><Icon name="star" /><Icon name="star" /><Icon name="star_half" />
+                <div className="flex justify-between mt-4 text-[10px] text-slate-500 font-bold uppercase">
+                  <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
                 </div>
-                <p className="text-xs text-slate-400">125 reviews</p>
               </div>
-              <div className="flex-1 space-y-2">
-                <RatingBar stars="5" percent={70} />
-                <RatingBar stars="4" percent={20} />
-                <RatingBar stars="3" percent={5} />
-                <RatingBar stars="2" percent={3} />
-                <RatingBar stars="1" percent={2} />
-              </div>
-            </div>
-            <div className="pt-6 border-t border-white/10 grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Top Categories</p>
-                <p className="text-sm font-bold text-white mt-1">Weddings, Corporate, Birthdays</p>
-              </div>
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Repeat Clients</p>
-                <p className="text-sm font-bold text-emerald-400 mt-1">25 (+5 this month)</p>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        <div className="flex gap-4 justify-end">
-          <button onClick={() => handleExport('csv')} className="flex items-center gap-2 px-6 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-bold text-white uppercase tracking-widest hover:bg-white/10 transition-colors">
-            <Icon name="download" className="text-[18px]" /> Export CSV
-          </button>
-          <button onClick={() => handleExport('pdf')} className="flex items-center gap-2 px-6 py-3 bg-violet-600 rounded-xl text-xs font-bold text-white uppercase tracking-widest hover:bg-violet-500 transition-colors shadow-lg shadow-violet-900/20">
-            <Icon name="picture_as_pdf" className="text-[18px]" /> Export PDF
-          </button>
-        </div>
+              <div className="bg-[#111827] border border-white/10 rounded-3xl p-6 shadow-xl">
+                <h3 className="text-sm font-bold text-white uppercase tracking-widest mb-6">Customer Satisfaction</h3>
+                <div className="flex items-center gap-8 mb-8">
+                  <div className="text-center">
+                    <p className="text-5xl font-black text-white">4.8</p>
+                    <div className="flex text-amber-400 my-2">
+                      <Icon name="star" /><Icon name="star" /><Icon name="star" /><Icon name="star" /><Icon name="star_half" />
+                    </div>
+                    <p className="text-xs text-slate-400">125 reviews</p>
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <RatingBar stars="5" percent={70} />
+                    <RatingBar stars="4" percent={20} />
+                    <RatingBar stars="3" percent={5} />
+                    <RatingBar stars="2" percent={3} />
+                    <RatingBar stars="1" percent={2} />
+                  </div>
+                </div>
+                <div className="pt-6 border-t border-white/10 grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Top Categories</p>
+                    <p className="text-sm font-bold text-white mt-1">Weddings, Corporate, Birthdays</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Repeat Clients</p>
+                    <p className="text-sm font-bold text-emerald-400 mt-1">25 (+5 this month)</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-4 justify-end">
+              <button onClick={() => handleExport('csv')} className="flex items-center gap-2 px-6 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-bold text-white uppercase tracking-widest hover:bg-white/10 transition-colors">
+                <Icon name="download" className="text-[18px]" /> Export CSV
+              </button>
+              <button onClick={() => handleExport('pdf')} className="flex items-center gap-2 px-6 py-3 bg-violet-600 rounded-xl text-xs font-bold text-white uppercase tracking-widest hover:bg-violet-500 transition-colors shadow-lg shadow-violet-900/20">
+                <Icon name="picture_as_pdf" className="text-[18px]" /> Export PDF
+              </button>
+            </div>
+          </>
+        )}
+        
+        {activeTab === "Sponsored Events" && (
+          <div className="space-y-6">
+             {mySponsorships.map(sponsor => {
+               const event = getEventById(sponsor.eventId);
+               const analytics = getSponsorAnalytics(sponsor.id);
+               return (
+                 <div key={sponsor.id} className="bg-[#111827] border border-white/10 rounded-3xl p-6 shadow-xl">
+                   <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 border-b border-white/5 pb-4 mb-4">
+                     <div className="flex items-center gap-4">
+                       <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-amber-400 to-orange-500 flex items-center justify-center shadow-lg"><Icon name="stars" className="text-white text-xl" /></div>
+                       <div>
+                         <h3 className="text-lg font-black text-white">{event?.title || "Sponsored Event"}</h3>
+                         <p className="text-[10px] font-black uppercase tracking-widest text-amber-400 mt-1">{sponsor.packageName} â€¢ FCFA {Number(sponsor.amount).toLocaleString()}</p>
+                       </div>
+                     </div>
+                     <div className="flex items-center gap-2">
+                        {sponsor.visibility?.tickets && <span className="bg-violet-500/10 text-violet-400 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">Tickets</span>}
+                        {sponsor.visibility?.websites && <span className="bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">Website</span>}
+                     </div>
+                   </div>
+                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                     <div className="bg-black/20 rounded-xl p-4 border border-white/5"><p className="text-[10px] uppercase font-bold text-slate-500">Impressions</p><p className="text-xl font-black text-white mt-1">{analytics.impressions.toLocaleString()}</p></div>
+                     <div className="bg-black/20 rounded-xl p-4 border border-white/5"><p className="text-[10px] uppercase font-bold text-slate-500">Clicks</p><p className="text-xl font-black text-white mt-1">{analytics.clicks.toLocaleString()}</p></div>
+                     <div className="bg-black/20 rounded-xl p-4 border border-white/5"><p className="text-[10px] uppercase font-bold text-slate-500">Ticket Views</p><p className="text-xl font-black text-white mt-1">{analytics.ticketViews.toLocaleString()}</p></div>
+                     <div className="bg-black/20 rounded-xl p-4 border border-white/5"><p className="text-[10px] uppercase font-bold text-slate-500">Website Views</p><p className="text-xl font-black text-white mt-1">{analytics.websiteViews.toLocaleString()}</p></div>
+                   </div>
+                 </div>
+               );
+             })}
+             {mySponsorships.length === 0 && (
+               <div className="text-center py-12 bg-[#111827] border border-white/10 rounded-3xl">
+                 <Icon name="campaign" className="text-5xl text-slate-600 mb-4" />
+                 <h3 className="text-lg font-bold text-white">No Sponsored Events</h3>
+                 <p className="text-slate-400 mt-2">Sponsor an event from the marketplace to see analytics here.</p>
+               </div>
+              </div>
+             )}
+          </div>
+        )}
       </div>
     </Layout>
   );

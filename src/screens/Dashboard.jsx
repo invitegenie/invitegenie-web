@@ -1,4 +1,4 @@
-﻿import { Link, useNavigate, useSearchParams } from "react-router-dom";
+﻿﻿import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMemo, useState } from "react";
 import Layout from "../components/Layout";
 import { useAuth } from "../auth/AuthContext";
@@ -33,17 +33,17 @@ export default function Dashboard() {
 
   const data = ensureDemoData();
   const tools = getDashboardToolsForRole(role);
-  const events = getEvents();
-  const listings = getMarketplaceProviders();
-  const myTickets = getTicketsByUser(currentUser?.id);
-  const myBookings = getBookingsByUser(currentUser?.id);
+  const events = getEvents() || [];
+  const listings = getMarketplaceProviders() || [];
+  const myTickets = getTicketsByUser(currentUser?.id) || [];
+  const myBookings = getBookingsByUser(currentUser?.id) || [];
   const myListings = listings.filter((listing) => String(listing.ownerId || listing.userId) === String(currentUser?.id));
-  const sellerOrders = getMarketplaceOrdersForSeller(currentUser?.id);
-  const quoteRequests = getQuoteRequests().filter((request) => String(request.sellerId || request.providerId) === String(currentUser?.id) || myListings.some((listing) => String(listing.id) === String(request.providerId)));
-  const memoryGroups = getFeedMemoryGroups("Trending").slice(0, 3);
+  const sellerOrders = getMarketplaceOrdersForSeller(currentUser?.id) || [];
+  const quoteRequests = (getQuoteRequests() || []).filter((request) => String(request.sellerId || request.providerId) === String(currentUser?.id) || myListings.some((listing) => String(listing.id) === String(request.providerId)));
+  const memoryGroups = (getFeedMemoryGroups("Trending") || []).slice(0, 3);
 
   const ownedEvents = useMemo(
-    () => events.filter((event) => String(event.hostId) === String(currentUser?.id)),
+    () => (events || []).filter((event) => String(event.hostId) === String(currentUser?.id)),
     [events, currentUser]
   );
 
@@ -108,6 +108,11 @@ export default function Dashboard() {
                   Create Listing
                 </button>
               ) : null}
+              {hasPermission(profile || role, "use_ai_marketing_studio") ? (
+                <button onClick={() => navigate("/ai-marketing-studio")} className="rounded-2xl border border-amber-400/30 bg-amber-400/10 px-5 py-3 text-xs font-black uppercase tracking-widest text-amber-100 hover:bg-amber-400/20">
+                  AI Marketing
+                </button>
+              ) : null}
               <Link to="/pricing" className="rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3 text-center text-xs font-black uppercase tracking-widest text-slate-200 hover:bg-white/[0.08]">
                 Plans
               </Link>
@@ -130,7 +135,7 @@ export default function Dashboard() {
         </section>
 
         <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {tools.map((tool) => (
+          {(tools || []).map((tool) => (
             <button
               key={`${tool.label}-${tool.path}`}
               onClick={() => navigate(tool.path)}
@@ -232,10 +237,10 @@ export default function Dashboard() {
           <aside className="space-y-6">
             <Panel title="Demo Accounts" subtitle="Quick ecosystem size">
               <div className="grid grid-cols-2 gap-3">
-                <MiniStat label="Users" value={data.users.length} />
-                <MiniStat label="Events" value={data.events.length} />
-                <MiniStat label="Listings" value={data.listings.length} />
-                <MiniStat label="Memories" value={data.memories.length} />
+                <MiniStat label="Users" value={data?.users?.length || 0} />
+                <MiniStat label="Events" value={data?.events?.length || 0} />
+                <MiniStat label="Listings" value={data?.listings?.length || 0} />
+                <MiniStat label="Memories" value={data?.memories?.length || 0} />
               </div>
             </Panel>
             <Panel title="Next Actions" subtitle="Useful shortcuts">
@@ -337,7 +342,7 @@ function RoleWorkspace({ role, currentUser, ownedEvents, myListings, sellerOrder
   if (role === "checkin_agent") {
     return (
       <div className="grid gap-4 md:grid-cols-3">
-        <MiniStat label="Today's Events" value={data.events.slice(0, 5).length} />
+        <MiniStat label="Today's Events" value={(data?.events || []).slice(0, 5).length} />
         <MiniStat label="Checked-in Guests" value={42} />
         <MiniStat label="Validation Logs" value={128} />
       </div>
@@ -345,9 +350,9 @@ function RoleWorkspace({ role, currentUser, ownedEvents, myListings, sellerOrder
   }
   return (
     <div className="grid gap-4 md:grid-cols-3">
-      <MiniStat label="Events Attended" value={data.tickets.filter((ticket) => String(ticket.userId) === String(currentUser?.id)).length} />
+      <MiniStat label="Events Attended" value={(data?.tickets || []).filter((ticket) => String(ticket.userId) === String(currentUser?.id)).length} />
       <MiniStat label="Owned Events" value={ownedEvents.length} />
-      <MiniStat label="Platform Memories" value={data.memories.length} />
+      <MiniStat label="Platform Memories" value={data?.memories?.length || 0} />
     </div>
   );
 }

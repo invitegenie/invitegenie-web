@@ -136,8 +136,8 @@ function chooseFrontMemory(memories) {
 export function getFeedMemoryGroups(sortMode = "Recent", filter = "Recent") {
   ensureDemoData();
   const usersById = new Map(getDemoUsers().map((user) => [String(user.id), user]));
-  const events = getEvents();
-  const memories = getMemories().map(enrichMemory);
+  const events = getEvents() || [];
+  const memories = (getMemories() || []).map(enrichMemory);
 
   const groups = events
     .map((event) => {

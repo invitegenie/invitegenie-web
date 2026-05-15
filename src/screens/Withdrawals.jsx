@@ -68,8 +68,8 @@ export default function Withdrawals() {
   const isAdminRoute = location.pathname.startsWith("/admin");
   
   const { currentUser, profile } = useAuth();
-  const user = currentUser || Engine.getCurrentUser();
-  const isPayoutAdmin = hasPermission(profile || user?.role, "manage_payouts");
+  const user = currentUser || (typeof Engine.getCurrentUser === 'function' ? Engine.getCurrentUser() : {}) || {};
+  const isPayoutAdmin = hasPermission(profile?.role || user?.role, "manage_payouts");
 
   const [withdrawals, setWithdrawals] = useState([]);
   const [filter, setFilter] = useState("All");
@@ -89,12 +89,16 @@ export default function Withdrawals() {
 
   useEffect(() => {
     // Initialize or load demo withdrawals
-    const stored = localStorage.getItem(DEMO_WITHDRAWALS_KEY);
-    if (!stored) {
-      localStorage.setItem(DEMO_WITHDRAWALS_KEY, JSON.stringify(INITIAL_WITHDRAWALS));
+    try {
+      const stored = localStorage.getItem(DEMO_WITHDRAWALS_KEY);
+      if (!stored) {
+        localStorage.setItem(DEMO_WITHDRAWALS_KEY, JSON.stringify(INITIAL_WITHDRAWALS));
+        setWithdrawals(INITIAL_WITHDRAWALS);
+      } else {
+        setWithdrawals(JSON.parse(stored));
+      }
+    } catch (error) {
       setWithdrawals(INITIAL_WITHDRAWALS);
-    } else {
-      setWithdrawals(JSON.parse(stored));
     }
   }, []);
 

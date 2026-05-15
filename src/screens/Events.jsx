@@ -1,27 +1,54 @@
-﻿import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+﻿﻿import { useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import Layout from "../components/Layout";
 import { useAuth } from "../auth/AuthContext";
 import { getEvents } from "../services/mockData";
+import { ALL_EVENT_STORAGE_KEYS } from "../services/eventStoreService";
 import { hasPermission } from "../services/roles";
 import { useSearch } from "../contexts/SearchContext";
+import { getVisibleEventsForUser } from "../services/eventVisibilityService";
+import { isUserApproved, hasPendingRequest, isUserInvited } from "../services/eventAccessService";
 
 const categories = ["All", "Weddings", "Concerts", "Corporate", "Cultural", "Fashion"];
 
 export default function Events() {
   const navigate = useNavigate();
-  const { profile, role } = useAuth();
+  const location = useLocation();
+  const { currentUser, profile, role } = useAuth();
   const { searchQuery, setSearchQuery } = useSearch();
   const [category, setCategory] = useState("All");
   const [sort, setSort] = useState("Soonest");
-  const events = getEvents();
+  const [events, setEvents] = useState(() => getEvents());
   const canCreate = hasPermission(profile || role, "create_event");
+  const createdEventId = location.state?.createdEventId;
+
+  useEffect(() => {
+    const refreshEvents = (event) => {
+      const changedKey = event?.detail?.key || event?.key;
+      if (changedKey && !ALL_EVENT_STORAGE_KEYS.includes(changedKey)) return;
+      setEvents(getEvents());
+    };
+
+    window.addEventListener("invitegenie:data-change", refreshEvents);
+    window.addEventListener("storage", refreshEvents);
+    return () => {
+      window.removeEventListener("invitegenie:data-change", refreshEvents);
+      window.removeEventListener("storage", refreshEvents);
+    };
+  }, []);
 
   const filteredEvents = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return events
+    
+    // Filter out private/hidden events based on visibility rules
+    const visibleEvents = getVisibleEventsForUser(currentUser || profile, events);
+    
+    return visibleEvents
       .filter((event) => {
-        const matchesCategory = category === "All" || event.category === category;
+        const normalizedCategory = String(event.category || "").toLowerCase().replace(/s$/, "");
+        const activeCategory = String(category || "").toLowerCase().replace(/s$/, "");
+        const matchesCategory = category === "All" || normalizedCategory === activeCategory;
         const matchesSearch = !q || [event.title, event.location, event.vendorName, event.category].join(" ").toLowerCase().includes(q);
         return matchesCategory && matchesSearch;
       })
@@ -30,7 +57,21 @@ export default function Events() {
         if (sort === "Popular") return Number(b.ticketsSold || 0) - Number(a.ticketsSold || 0);
         return new Date(a.date).getTime() - new Date(b.date).getTime();
       });
-  }, [events, searchQuery, category, sort]);
+  }, [events, searchQuery, category, sort, currentUser, profile]);
+
+  const getEventCTA = (event) => {
+    const user = currentUser || profile;
+    if (event.availableTickets <= 0) return "Sold Out";
+    if (event.visibility === "vip_request") {
+      if (isUserApproved(event.id, user)) return "Buy VIP Ticket";
+      if (hasPendingRequest(event.id, user)) return "Request Pending";
+      return "Request Access";
+    }
+    if (event.visibility === "invite_only") {
+      return "View Invitation";
+    }
+    return Number(event.price || 0) > 0 ? "Buy Ticket" : "Register";
+  };
 
   return (
     <Layout showHeader={false}>
@@ -62,15 +103,27 @@ export default function Events() {
           </div>
         </header>
 
+        {createdEventId ? (
+          <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm font-semibold text-emerald-100">
+            Event created successfully. It is now live in your events list.
+          </div>
+        ) : null}
+
         <section className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {filteredEvents.map((event) => (
-            <button key={event.id} onClick={() => navigate(`/events/${event.id}`)} className="group overflow-hidden rounded-3xl border border-white/10 bg-[#111827] text-left shadow-lg transition hover:-translate-y-0.5 hover:border-violet-400/40">
+            <button key={event.id} onClick={() => navigate(`/events/${event.id}`)} className="group flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#111827] text-left shadow-lg transition hover:-translate-y-0.5 hover:border-violet-400/40">
               <div className="relative h-48 overflow-hidden">
                 <img src={event.image} alt={event.title} className="h-full w-full object-cover transition duration-700 group-hover:scale-105" />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
                 <div className="absolute left-3 top-3 rounded-full bg-black/60 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white backdrop-blur">{event.category}</div>
+                
+                {event.visibility && event.visibility !== "public" && (
+                  <div className="absolute right-3 top-3 rounded-full border border-amber-300/30 bg-amber-500/20 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-amber-100 backdrop-blur">
+                    {event.visibility.replace("_", " ")}
+                  </div>
+                )}
               </div>
-              <div className="space-y-4 p-5">
+              <div className="flex flex-1 flex-col space-y-4 p-5">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-300">{formatDate(event.date)} - {event.time}</p>
                   <h2 className="mt-2 line-clamp-2 min-h-[3.5rem] text-xl font-black text-white">{event.title}</h2>
@@ -85,6 +138,11 @@ export default function Events() {
                     <p className="text-sm font-black text-emerald-300">FCFA {Number(event.price || 0).toLocaleString()}</p>
                   </div>
                   <p className="text-xs font-bold text-slate-400">{event.availableTickets} left</p>
+                </div>
+                <div className="pt-3 border-t border-white/5 mt-auto">
+                  <div className={`w-full rounded-xl py-3 text-center text-xs font-black uppercase tracking-widest transition ${event.availableTickets <= 0 ? "bg-slate-800 text-slate-500" : "bg-white/5 text-white group-hover:bg-violet-600"}`}>
+                    {getEventCTA(event)}
+                  </div>
                 </div>
               </div>
             </button>

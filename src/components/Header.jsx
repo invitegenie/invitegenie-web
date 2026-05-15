@@ -4,15 +4,20 @@ import Icon from "./Icon";
 import ProfileDropdown from "./ProfileDropdown";
 import { useSearch } from "../contexts/SearchContext";
 import { useAuth } from "../auth/AuthContext";
+import { hasAnyPermission } from "../services/roles";
 
 export default function Header({ name, tier }) {
   const navigate = useNavigate();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const { searchQuery, setSearchQuery } = useSearch();
+  const { profile, role } = useAuth();
+  const canCreateMarketplace = hasAnyPermission(profile || role, ["create_marketplace_listing", "create_marketplace_product", "manage_all_storefronts"]);
 
   return (
     <header className="relative z-50 hidden items-center justify-between gap-6 rounded-3xl border border-white/10 bg-slate-950/70 px-5 py-4 shadow-xl backdrop-blur-xl xl:flex">
+      {/* Brand + Search */}
       <div className="flex min-w-[260px] max-w-md flex-1 items-center gap-3 rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3 text-slate-400">
+        <span className="hidden lg:inline-block text-2xl font-black tracking-tight bg-gradient-to-r from-[#8B5CF6] to-[#22C55E] bg-clip-text text-transparent drop-shadow-sm mr-4" style={{ WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>InviteGenie</span>
         <Icon name="search" />
         <input
           type="text"
@@ -24,12 +29,14 @@ export default function Header({ name, tier }) {
       </div>
 
       <div className="flex shrink-0 items-center gap-4">
-        <button
-          onClick={() => navigate("/marketplace/new")}
-          className="rounded-2xl border border-[#8B5CF6]/40 bg-[#8B5CF6]/10 px-5 py-3 text-sm font-bold text-violet-100 transition-all hover:bg-[#8B5CF6]/20"
-        >
-          Create Listing
-        </button>
+        {canCreateMarketplace ? (
+          <button
+            onClick={() => navigate("/marketplace/new")}
+            className="rounded-2xl border border-[#8B5CF6]/40 bg-[#8B5CF6]/10 px-5 py-3 text-sm font-bold text-violet-100 transition-all hover:bg-[#8B5CF6]/20"
+          >
+            Create Listing
+          </button>
+        ) : null}
 
         <button 
           onClick={() => navigate("/events/new")}

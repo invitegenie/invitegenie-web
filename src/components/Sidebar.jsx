@@ -1,9 +1,11 @@
 import { useNavigate, useLocation } from "react-router-dom";
+import { useMemo } from "react";
 import Icon from "./Icon";
 import { CATEGORY_LABELS, NAV_ITEMS } from "../navigation/navItems";
 import * as Engine from "../auth/coreEngine";
 import { useAuth } from "../auth/AuthContext";
-import { hasPermission, canCreateMarketplaceListing, USER_ROLES } from "../services/roles";
+import { hasPermission, hasAnyPermission, USER_ROLES } from "../services/roles";
+import { getOwnedProviderForUser } from "../services/marketplaceStorefrontService";
 
 export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse }) {
   const navigate = useNavigate();
@@ -12,7 +14,10 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
   const user = currentUser || Engine.getCurrentUser();
 
   const isSuperAdmin = user?.role === USER_ROLES.SUPER_ADMIN;
-  const showMyListings = isSuperAdmin || [USER_ROLES.VENDOR_PRO, USER_ROLES.TASKER, USER_ROLES.VENDOR_BASIC].includes(user?.role);
+  const myProvider = useMemo(() => getOwnedProviderForUser(user?.id), [user?.id]);
+  const showMyStorefront = isSuperAdmin || hasPermission(profile || user, "manage_own_storefront");
+  const myStorefrontPath = myProvider?.id ? `/marketplace/${myProvider.id}/storefront` : "/marketplace/new";
+  const canCreateMarketplace = hasAnyPermission(profile || user, ["create_marketplace_listing", "create_marketplace_product", "manage_all_storefronts"]);
 
   const groupedNavItems = NAV_ITEMS.filter((item) => {
     if (isSuperAdmin || !item.requiredPermission) return true;
@@ -48,7 +53,12 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
           onClick={() => { navigate("/dashboard"); onClose(); }}
         >
           <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-[#8B5CF6] to-[#22C55E] flex-shrink-0" />
-          {!isCollapsed && <h2 className="text-xl font-bold tracking-tighter text-[#F9FAFB] group-hover:text-white transition-colors">InviteGenie</h2>}
+          {!isCollapsed && (
+            <h2 className="text-xl font-bold tracking-tighter bg-gradient-to-r from-[#8B5CF6] to-[#22C55E] bg-clip-text text-transparent drop-shadow-sm group-hover:text-white transition-colors"
+                style={{ WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              InviteGenie
+            </h2>
+          )}
         </div>
         <button onClick={onToggleCollapse} className="hidden xl:flex text-[#6B7280] hover:text-white transition-colors">
           <Icon name={isCollapsed ? "keyboard_double_arrow_right" : "keyboard_double_arrow_left"} />
@@ -90,7 +100,7 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
         ))}
 
         {/* Marketplace Management (Vendor/Tasker specific) */}
-        {showMyListings && (
+        {showMyStorefront && (
           <div className="space-y-1">
             {!isCollapsed && (
               <p className="px-4 pb-2 text-[10px] font-black uppercase tracking-[0.22em] text-[#6B7280] mt-4">
@@ -98,20 +108,81 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
               </p>
             )}
             <button
-              onClick={() => { navigate("/marketplace/my-listings"); onClose(); }}
+              onClick={() => { navigate(myStorefrontPath); onClose(); }}
               className={`
                 w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all group
-                ${location.pathname === "/marketplace/my-listings" 
+                ${location.pathname === myStorefrontPath 
                   ? "bg-[#8B5CF6] text-white shadow-lg shadow-[#8B5CF6]/20" 
                   : "text-[#9CA3AF] hover:bg-[#1F2937] hover:text-[#F9FAFB]"}
               `}
-              title="My Listings"
+              title="My Storefront"
             >
-              <Icon name="inventory_2" className={`text-[22px] ${location.pathname === "/marketplace/my-listings" ? "text-white" : "text-[#6B7280] group-hover:text-[#A78BFA]"}`} />
-              {!isCollapsed && <span className="text-sm font-medium tracking-tight">My Listings</span>}
+              <Icon name="store" className={`text-[22px] ${location.pathname === myStorefrontPath ? "text-white" : "text-[#6B7280] group-hover:text-[#A78BFA]"}`} />
+              {!isCollapsed && <span className="text-sm font-medium tracking-tight">My Storefront</span>}
             </button>
           </div>
         )}
+
+        {/* New Features (Test) */}
+        <div className="space-y-1 mt-4">
+          {!isCollapsed && (
+            <p className="px-4 pb-2 text-[10px] font-black uppercase tracking-[0.22em] text-[#6B7280]">
+              New Features
+            </p>
+          )}
+          
+          <button
+            onClick={() => { navigate("/ai-planner"); onClose(); }}
+            className={`
+              w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all group
+              ${location.pathname.startsWith("/ai-planner") 
+                ? "bg-[#8B5CF6] text-white shadow-lg shadow-[#8B5CF6]/20" 
+                : "text-[#9CA3AF] hover:bg-[#1F2937] hover:text-[#F9FAFB]"}
+            `}
+          >
+            <Icon name="auto_awesome" className={`text-[22px] ${location.pathname.startsWith("/ai-planner") ? "text-white" : "text-[#6B7280] group-hover:text-[#A78BFA]"}`} />
+            {!isCollapsed && <span className="text-sm font-medium tracking-tight">AI Event Planner</span>}
+          </button>
+          
+          <button
+            onClick={() => { navigate("/ai-marketing-studio"); onClose(); }}
+            className={`
+              w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all group
+              ${location.pathname.startsWith("/ai-marketing-studio") 
+                ? "bg-[#8B5CF6] text-white shadow-lg shadow-[#8B5CF6]/20" 
+                : "text-[#9CA3AF] hover:bg-[#1F2937] hover:text-[#F9FAFB]"}
+            `}
+          >
+            <Icon name="campaign" className={`text-[22px] ${location.pathname.startsWith("/ai-marketing-studio") ? "text-white" : "text-[#6B7280] group-hover:text-[#A78BFA]"}`} />
+            {!isCollapsed && <span className="text-sm font-medium tracking-tight">AI Marketing Studio</span>}
+          </button>
+          
+          <button
+            onClick={() => { navigate("/vendor-genie"); onClose(); }}
+            className={`
+              w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all group
+              ${location.pathname.startsWith("/vendor-genie") 
+                ? "bg-[#8B5CF6] text-white shadow-lg shadow-[#8B5CF6]/20" 
+                : "text-[#9CA3AF] hover:bg-[#1F2937] hover:text-[#F9FAFB]"}
+            `}
+          >
+            <Icon name="psychology" className={`text-[22px] ${location.pathname.startsWith("/vendor-genie") ? "text-white" : "text-[#6B7280] group-hover:text-[#A78BFA]"}`} />
+            {!isCollapsed && <span className="text-sm font-medium tracking-tight">Vendor Genie</span>}
+          </button>
+
+          <button
+            onClick={() => { navigate("/vendor-crm"); onClose(); }}
+            className={`
+              w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all group
+              ${location.pathname.startsWith("/vendor-crm") 
+                ? "bg-[#8B5CF6] text-white shadow-lg shadow-[#8B5CF6]/20" 
+                : "text-[#9CA3AF] hover:bg-[#1F2937] hover:text-[#F9FAFB]"}
+            `}
+          >
+            <Icon name="contact_page" className={`text-[22px] ${location.pathname.startsWith("/vendor-crm") ? "text-white" : "text-[#6B7280] group-hover:text-[#A78BFA]"}`} />
+            {!isCollapsed && <span className="text-sm font-medium tracking-tight">Vendor CRM</span>}
+          </button>
+        </div>
 
         {/* Create Listing Action */}
         <div className="mt-4 px-2 space-y-2">
@@ -127,17 +198,19 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
             {!isCollapsed && <span className="text-[10px] font-black uppercase tracking-widest">Create Event</span>}
           </button>
 
-          <button
-            onClick={() => { navigate("/marketplace/new"); onClose(); }}
-            className={`
-              flex items-center justify-center border border-[#8B5CF6]/40 bg-[#8B5CF6]/10 text-white rounded-2xl hover:bg-[#8B5CF6]/20 transition-all
-              ${isCollapsed ? "w-10 h-10" : "w-full py-3.5 gap-2 px-4"}
-            `}
-            title="Create Listing"
-          >
-            <Icon name="add_business" className="text-[20px] text-[#A78BFA]" />
-            {!isCollapsed && <span className="text-[10px] font-black uppercase tracking-widest text-[#A78BFA]">Create Listing</span>}
-          </button>
+          {canCreateMarketplace ? (
+            <button
+              onClick={() => { navigate("/marketplace/new"); onClose(); }}
+              className={`
+                flex items-center justify-center border border-[#8B5CF6]/40 bg-[#8B5CF6]/10 text-white rounded-2xl hover:bg-[#8B5CF6]/20 transition-all
+                ${isCollapsed ? "w-10 h-10" : "w-full py-3.5 gap-2 px-4"}
+              `}
+              title="Create Listing"
+            >
+              <Icon name="add_business" className="text-[20px] text-[#A78BFA]" />
+              {!isCollapsed && <span className="text-[10px] font-black uppercase tracking-widest text-[#A78BFA]">Create Listing</span>}
+            </button>
+          ) : null}
         </div>
 
         {/* Promotional upgrade card: only show if user is below PRO tier */}
@@ -166,19 +239,17 @@ export default function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse
             {!isCollapsed && <span className="text-sm font-medium">Support</span>}
            </button>
            <button 
-            onClick={() => { 
-              if (confirm("Are you sure you want to sign out?")) { 
-                // DEMO ONLY: Clear temporary admin session
-                localStorage.removeItem("ig_demo_admin_user");
-                sessionStorage.removeItem("super_admin_2fa_verified");
-                
-                Engine.logoutUser();
-                logout?.();
-                // Redirect to admin login if signing out from administrative area
-                const isAdminArea = location.pathname.startsWith("/admin");
-                navigate(isAdminArea ? "/admin/login" : "/login", { replace: true });
-                onClose();
-              } 
+            onClick={async () => { 
+              // DEMO ONLY: Clear temporary admin session
+              localStorage.removeItem("ig_demo_admin_user");
+              sessionStorage.removeItem("super_admin_2fa_verified");
+              
+              await logout?.();
+              
+              // Redirect to admin login if signing out from administrative area
+              const isAdminArea = location.pathname.startsWith("/admin");
+              navigate(isAdminArea ? "/admin/login" : "/login", { replace: true });
+              onClose();
             }}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-400 hover:bg-red-500/10 transition-all"
            >

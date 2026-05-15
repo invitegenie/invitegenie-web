@@ -9,6 +9,7 @@ import { NORMAL_USER_ROLES, USER_ROLES } from "./services/roles";
 
 import Dashboard from "./screens/Dashboard";
 import Login from "./screens/Login";
+import VerifyEmail from "./screens/VerifyEmail";
 import AdminLogin from "./screens/AdminLogin";
 import SuperAdminTwoFactor from "./screens/SuperAdminTwoFactor";
 import SuperAdminDashboard from "./screens/SuperAdminDashboard";
@@ -24,6 +25,7 @@ import Events from "./screens/Events";
 import Bookings from "./screens/Bookings";
 import BookingDetails from "./screens/BookingDetails";
 import EVoucher from "./screens/EVoucher";
+import EventWebsite from "./screens/EventWebsite";
 import GuestManagement from "./screens/GuestManagement";
 import Guests from "./screens/Guests";
 import Analytics from "./screens/Analytics";
@@ -41,6 +43,7 @@ import Integrations from "./screens/Integrations";
 import EventDetails from "./screens/EventDetails";
 import Marketplace from "./screens/Marketplace";
 import MarketplaceDetails from "./screens/MarketplaceDetails";
+import MarketplaceStorefront, { StorefrontModeration } from "./screens/MarketplaceStorefront";
 import CreateMarketplaceListing from "./screens/CreateMarketplaceListing";
 import VendorReview from "./screens/VendorReview";
 import VendorPortfolio from "./screens/VendorPortfolio";
@@ -48,6 +51,7 @@ import VendorWallet from "./screens/VendorWallet";
 import AdminVendorManagement from "./screens/AdminVendorManagement";
 import VendorInsights from "./screens/VendorInsights";
 import VendorBooking from "./screens/VendorBooking";
+import AIMarketingStudio from "./screens/AIMarketingStudio";
 import VendorGenie from "./screens/VendorGenie";
 import Wallet from "./screens/Wallet";
 import Pricing from "./screens/Pricing";
@@ -75,6 +79,28 @@ import PaymentMethods from "./screens/PaymentMethods";
 import Billing from "./screens/Billing";
 import SeatingPlanner from "./screens/SeatingPlanner";
 import VenueBuilder from "./screens/VenueBuilder";
+import AvailabilityCalendar from "./screens/AvailabilityCalendar";
+import ProviderAvailability from "./screens/ProviderAvailability";
+import AIEventPlanner from "./screens/AIEventPlanner";
+import VendorCRM from "./components/VendorCRM";
+import CRMCustomerDetails from "./components/CRMCustomerDetails";
+import CRMLeadDetails from "./components/CRMLeadDetails";
+import CRMInvoiceDetails from "./components/CRMInvoiceDetails";
+import StorefrontSettings from "./screens/StorefrontSettings";
+import StorefrontThemeEditor from "./screens/StorefrontThemeEditor";
+import StorefrontAnalytics from "./screens/StorefrontAnalytics";
+import EventOperationsDashboard from "./screens/EventOperationsDashboard";
+import EventCommandCenter from "./screens/EventCommandCenter";
+import StaffCoordinationBoard from "./screens/StaffCoordinationBoard";
+import VendorCheckinScreen from "./screens/VendorCheckinScreen";
+import EventCheckout from "./screens/EventCheckout";
+import EventLive from "./screens/EventLive";
+import EventSponsorManagement from "./screens/EventSponsorManagement";
+import AdminSponsorships from "./screens/AdminSponsorships";
+import PaymentStatus from "./screens/PaymentStatus";
+import AdminPayments from "./screens/AdminPayments";
+import AdminFinanceSettings from "./screens/AdminFinanceSettings";
+import BetaLaunchBanner from "./components/BetaLaunchBanner";
 
 function AdminModulePlaceholder({ title, description, icon }) {
   return (
@@ -91,15 +117,25 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <BetaLaunchBanner />
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Login />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/shared/event/:eventId" element={<SharedMemoryPreview />} />
+          <Route path="/shared/event/:eventId/website" element={<EventWebsite />} />
+          <Route path="/event-site/:eventId" element={<EventWebsite />} />
+          <Route path="/events/:eventId/website" element={<EventWebsite />} />
           <Route path="/shared/memory/:memoryId" element={<SharedMemoryPreview />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
+          
+          <Route path="/payment/success" element={<PaymentStatus status="success" />} />
+          <Route path="/payment/failed" element={<PaymentStatus status="failed" />} />
+          <Route path="/payment/pending" element={<PaymentStatus status="pending" />} />
+          <Route path="/payments/:paymentId" element={<PaymentStatus />} />
 
           <Route
             path="/admin/2fa"
@@ -170,12 +206,8 @@ export default function App() {
             <Route
               path="marketplace"
               element={
-                <AdminProtectedRoute requiredPermission="approve_marketplace_listings">
-                  <AdminModulePlaceholder
-                    title="Marketplace Approvals"
-                    description="Review marketplace listings, approve vendors, and moderate flagged content."
-                    icon="storefront"
-                  />
+                <AdminProtectedRoute requiredPermission="moderate_storefronts">
+                  <StorefrontModeration />
                 </AdminProtectedRoute>
               }
             />
@@ -228,6 +260,30 @@ export default function App() {
               element={
                 <AdminProtectedRoute requiredPermission="view_all_events">
                   <AdminModulePlaceholder title="Events" description="View and manage events across InviteGenie." icon="event_available" />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="sponsorships"
+              element={
+                <AdminProtectedRoute requiredPermission="moderate_event_sponsors">
+                  <AdminSponsorships />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="payments"
+              element={
+                <AdminProtectedRoute requiredPermission="view_all_payments">
+                  <AdminPayments />
+                </AdminProtectedRoute>
+              }
+            />
+            <Route
+              path="finance-settings"
+              element={
+                <AdminProtectedRoute requiredPermission="manage_platform_settings">
+                  <AdminFinanceSettings />
                 </AdminProtectedRoute>
               }
             />
@@ -300,21 +356,52 @@ export default function App() {
             <Route path="/system-audit-log" element={<Navigate to="/admin/audit-logs" replace />} />
           </Route>
 
+          <Route element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
+            <Route path="/marketplace" element={<Marketplace />} />
+            <Route path="/s/:slug" element={<MarketplaceStorefront />} />
+            <Route path="/store/:slug" element={<MarketplaceStorefront />} />
+            <Route
+              path="/marketplace/new"
+              element={
+                <ProtectedRoute requiredAnyPermissions={["create_marketplace_listing", "create_marketplace_product", "manage_all_storefronts"]}>
+                  <CreateMarketplaceListing />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/marketplace/:providerId/storefront" element={<MarketplaceStorefront />} />
+            <Route path="/marketplace/:providerId/book" element={<ProtectedRoute requiredAnyPermissions={["book_vendor", "browse_marketplace", "buy_marketplace_item", "manage_all_storefronts"]}><VendorBooking /></ProtectedRoute>} />
+            <Route path="/marketplace/:providerId/review" element={<ProtectedRoute requiredAnyPermissions={["review_vendor", "browse_marketplace"]}><VendorReview /></ProtectedRoute>} />
+            <Route path="/marketplace/:providerId/portfolio" element={<VendorPortfolio />} />
+            <Route path="/marketplace/vendor/:vendorId" element={<MarketplaceDetails />} />
+            <Route path="/marketplace/:providerId" element={<MarketplaceDetails />} />
+            <Route path="/checkout" element={<Checkout />} />
+            <Route path="/marketplace/:providerId/availability" element={<ProviderAvailability />} />
+            <Route path="/storefront/settings" element={<ProtectedRoute requiredAnyPermissions={["manage_own_storefront", "manage_all_storefronts", "vendorMode", "create_marketplace_listing"]}><StorefrontSettings /></ProtectedRoute>} />
+            <Route path="/storefront/theme" element={<ProtectedRoute requiredAnyPermissions={["edit_storefront_theme", "manage_all_storefronts", "vendorMode", "create_marketplace_listing"]}><StorefrontThemeEditor /></ProtectedRoute>} />
+            <Route path="/storefront/analytics" element={<ProtectedRoute requiredAnyPermissions={["view_storefront_analytics", "manage_all_storefronts", "vendorMode", "create_marketplace_listing"]}><StorefrontAnalytics /></ProtectedRoute>} />
+          </Route>
+
           <Route element={<ProtectedRoute allowedRoles={NORMAL_USER_ROLES}><Outlet /></ProtectedRoute>}>
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/ai-planner" element={<AIEventPlanner />} />
+            <Route path="/ai-planner/:planId" element={<AIEventPlanner />} />
+            <Route path="/events/:eventId/operations" element={<ProtectedRoute requiredPermission="view_event_operations_dashboard"><EventOperationsDashboard /></ProtectedRoute>} />
+            <Route path="/events/:eventId/command-center" element={<ProtectedRoute requiredPermission="view_command_center"><EventCommandCenter /></ProtectedRoute>} />
+            <Route path="/events/:eventId/staff" element={<ProtectedRoute requiredPermission="manage_staff_coordination"><StaffCoordinationBoard /></ProtectedRoute>} />
+            <Route path="/events/:eventId/checkins" element={<ProtectedRoute requiredPermission="manage_vendor_checkin"><VendorCheckinScreen /></ProtectedRoute>} />
+            <Route path="/vendor-crm" element={<ProtectedRoute requiredAnyPermissions={["view_vendor_crm"]}><VendorCRM /></ProtectedRoute>} />
+            <Route path="/vendor-crm/customers/:customerId" element={<ProtectedRoute requiredAnyPermissions={["view_vendor_crm"]}><CRMCustomerDetails /></ProtectedRoute>} />
+            <Route path="/vendor-crm/leads/:leadId" element={<ProtectedRoute requiredAnyPermissions={["manage_leads"]}><CRMLeadDetails /></ProtectedRoute>} />
+            <Route path="/vendor-crm/invoices/:invoiceId" element={<ProtectedRoute requiredAnyPermissions={["create_invoices", "view_vendor_crm"]}><CRMInvoiceDetails /></ProtectedRoute>} />
+            <Route path="/availability" element={<ProtectedRoute requiredAnyPermissions={["manage_availability", "manage_time_slots", "manage_staff_schedule", "manage_multi_location_availability", "vendorMode", "plannerMode", "taskerMode"]}><AvailabilityCalendar /></ProtectedRoute>} />
             <Route path="/home" element={<Dashboard />} />
             <Route path="/events" element={<Events />} />
             <Route path="/events/new" element={<ProtectedRoute requiredPermission="create_event"><CreateEvent /></ProtectedRoute>} />
             <Route path="/events/:eventId" element={<EventDetails />} />
+            <Route path="/events/:eventId/checkout" element={<EventCheckout />} />
+            <Route path="/events/:eventId/live" element={<EventLive />} />
+            <Route path="/events/:eventId/sponsors/manage" element={<ProtectedRoute requiredPermission="manage_event_sponsors"><EventSponsorManagement /></ProtectedRoute>} />
             <Route path="/creation-success/:eventId" element={<CreationSuccess />} />
-            <Route path="/marketplace" element={<Marketplace />} />
-            <Route path="/marketplace/new" element={<ProtectedRoute requiredPermission="create_marketplace_listing"><CreateMarketplaceListing /></ProtectedRoute>} />
-            <Route path="/marketplace/:providerId" element={<MarketplaceDetails />} />
-            <Route path="/marketplace/:providerId/review" element={<ProtectedRoute requiredAnyPermissions={["review_vendor", "browse_marketplace"]}><VendorReview /></ProtectedRoute>} />
-            <Route path="/marketplace/:providerId/portfolio" element={<VendorPortfolio />} />
-            <Route path="/marketplace/vendor/:vendorId" element={<MarketplaceDetails />} />
-            <Route path="/marketplace/:providerId/book" element={<ProtectedRoute requiredAnyPermissions={["book_vendor", "browse_marketplace"]}><VendorBooking /></ProtectedRoute>} />
-            <Route path="/checkout" element={<Checkout />} />
             <Route path="/withdrawals" element={<ProtectedRoute requiredAnyPermissions={["view_own_withdrawals", "view_company_withdrawals", "view_withdrawals", "manage_payouts"]}><Withdrawals /></ProtectedRoute>} />
             <Route path="/create-event" element={<ProtectedRoute requiredPermission="create_event"><CreateEvent /></ProtectedRoute>} />
             <Route path="/create-invitation" element={<ProtectedRoute requiredPermission="create_event"><CreateEvent /></ProtectedRoute>} />
@@ -340,6 +427,7 @@ export default function App() {
             <Route path="/invoices" element={<Invoices />} />
             <Route path="/integrations" element={<Integrations />} />
             <Route path="/venue-builder" element={<VenueBuilder />} />
+            <Route path="/events/:eventId/venue-builder" element={<VenueBuilder />} />
             <Route path="/convert-points" element={<Points />} />
             <Route path="/make-a-wish" element={<Wish />} />
             <Route path="/summon-genie" element={<SummonGenie />} />
@@ -364,7 +452,8 @@ export default function App() {
             <Route path="/vendor-wallet" element={<ProtectedRoute requiredPermission="view_vendor_wallet"><VendorWallet /></ProtectedRoute>} />
             <Route path="/vendor-portfolio" element={<ProtectedRoute requiredPermission="manage_vendor_portfolio"><VendorPortfolio /></ProtectedRoute>} />
             <Route path="/vendor-insights" element={<ProtectedRoute requiredAnyPermissions={["view_vendor_insights", "advanced_vendor_insights"]}><VendorInsights /></ProtectedRoute>} />
-            <Route path="/vendor-genie" element={<ProtectedRoute requiredAnyPermissions={["use_vendor_genie", "manage_ai_vendor_tools"]}><VendorGenie /></ProtectedRoute>} />
+            <Route path="/ai-marketing-studio" element={<ProtectedRoute requiredPermission="use_ai_marketing_studio"><AIMarketingStudio /></ProtectedRoute>} />
+            <Route path="/vendor-genie" element={<ProtectedRoute requiredAnyPermissions={["use_ai_marketing_studio", "use_vendor_genie", "manage_ai_vendor_tools"]}><VendorGenie /></ProtectedRoute>} />
             <Route path="/wallet" element={<ProtectedRoute requiredAnyPermissions={["view_wallet", "view_vendor_wallet", "view_all_wallets"]}><Wallet /></ProtectedRoute>} />
             <Route path="/tickets/buy/:eventId" element={<EventDetails />} />
           </Route>

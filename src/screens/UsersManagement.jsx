@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from "react";
+﻿﻿import React, { useState, useMemo } from "react";
 import Layout from "../components/Layout";
 import Icon from "../components/Icon";
 import * as Engine from "../auth/coreEngine";
@@ -202,7 +202,7 @@ export default function UsersManagement() {
 
       {isAddModalOpen && (
         <AddUserModal 
-          onClose={() => setIsAddModalOpen(null)} 
+          onClose={() => setIsAddModalOpen(false)} 
           onSave={handleAddUser}
           roles={Object.values(USER_ROLES)}
           tiers={tiers}

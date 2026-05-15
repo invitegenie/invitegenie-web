@@ -4,22 +4,22 @@ import { useAuth } from "../auth/AuthContext";
 import { hasPermission, hasAnyPermission } from "../services/roles";
 
 export default function ProtectedRoute({ children, requiredPermission, requiredAnyPermissions }) {
-  const { isAuthenticated, role: authRole } = useAuth();
+  const { isAuthenticated, role: authRole, profile } = useAuth();
 
   // DEMO ONLY: Allow temporary admin session for development
   const demoUser = JSON.parse(localStorage.getItem("ig_demo_admin_user") || "null");
   const isDemoAuthenticated = !!demoUser;
-  const role = isDemoAuthenticated ? "super_admin" : authRole;
+  const actor = isDemoAuthenticated ? demoUser || "super_admin" : profile || authRole;
 
   if (!isAuthenticated && !isDemoAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
-  if (requiredPermission && !hasPermission(role, requiredPermission)) {
+  if (requiredPermission && !hasPermission(actor, requiredPermission)) {
     return <Navigate to="/unauthorized" replace />;
   }
 
-  if (requiredAnyPermissions && !hasAnyPermission(role, requiredAnyPermissions)) {
+  if (requiredAnyPermissions && !hasAnyPermission(actor, requiredAnyPermissions)) {
     return <Navigate to="/unauthorized" replace />;
   }
 

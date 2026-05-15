@@ -141,6 +141,17 @@ export default function EventMemories() {
               createMemory({ userId: currentUser.id, eventId: event.id, ...payload });
               setPostOpen(false);
               setRefresh((value) => value + 1);
+              
+              // Simulate automatic Google Drive backup if connected
+              try {
+                const integrations = JSON.parse(localStorage.getItem("invitegenie_integrations") || "[]");
+                const drive = integrations.find(i => i.name === "Google Drive");
+                if (drive?.connected) {
+                  setTimeout(() => showToast("Memory successfully backed up to Google Drive ☁️"), 1500);
+                }
+              } catch (error) {
+                console.warn("Memory backup integration check failed.", error);
+              }
             }}
           />
         ) : null}

@@ -1,4 +1,4 @@
-﻿﻿import { useMemo, useState } from "react";
+﻿﻿﻿﻿﻿﻿import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import { useAuth } from "../auth/AuthContext";
@@ -6,6 +6,9 @@ import { getMarketplaceProviders } from "../services/mockData";
 import { getMarketplaceOrdersForSeller } from "../services/ticketingService";
 import { hasPermission } from "../services/roles";
 import { useSearch } from "../contexts/SearchContext";
+import { getStorefrontProducts } from "../services/marketplaceStorefrontService";
+import { getTenantByProviderId } from "../services/tenantService";
+import * as Engine from "../auth/coreEngine";
 
 const categories = ["All", "DJ", "Caterer", "Drink Supplier", "Decorator", "Photographer", "Videographer", "Tasker", "Errand Runner", "Delivery Service", "Makeup Artist", "Venue", "Security", "Usher", "Supermarket Shopper"];
 
@@ -16,9 +19,16 @@ export default function Marketplace() {
   const [category, setCategory] = useState("All");
   const [type, setType] = useState("All");
   const [sort, setSort] = useState("Recommended");
-  const listings = getMarketplaceProviders();
+  
+  const listings = useMemo(() => {
+    const engineVendors = Engine.getCollection(Engine.KEYS.VENDORS) || [];
+    const merged = [...engineVendors, ...getMarketplaceProviders()];
+    return merged.filter((v, i, a) => a.findIndex(t => String(t.id) === String(v.id)) === i);
+  }, []);
+
   const canCreate = hasPermission(profile || role, "create_marketplace_listing");
   const myOrders = getMarketplaceOrdersForSeller(currentUser?.id);
+  const myVendorListings = listings.filter((listing) => String(listing.ownerId) === String(currentUser?.id));
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -91,50 +101,66 @@ export default function Marketplace() {
           ))}
         </div>
 
-        {(role === "vendor" || role === "tasker") ? (
+        {(myVendorListings.length > 0 || role === "vendor" || role === "tasker") ? (
           <section className="grid gap-4 md:grid-cols-3">
-            <Metric label="My Listings" value={listings.filter((listing) => String(listing.ownerId) === String(currentUser?.id)).length} />
+            <Metric label="My Listings" value={myVendorListings.length} />
             <Metric label="Orders" value={myOrders.length} />
             <Metric label="Estimated Earnings" value={`FCFA ${myOrders.reduce((sum, order) => sum + Number(order.amount || 0), 0).toLocaleString()}`} />
           </section>
         ) : null}
 
         <section className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {filtered.map((listing) => (
-            <button key={listing.id} onClick={() => navigate(`/marketplace/${listing.id}`)} className="group overflow-hidden rounded-3xl border border-white/10 bg-[#111827] text-left shadow-lg transition hover:-translate-y-0.5 hover:border-violet-400/40">
-              <div className="relative h-48 overflow-hidden">
-                <img src={listing.image} alt={listing.title} className="h-full w-full object-cover transition duration-700 group-hover:scale-105" />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-transparent" />
-                <div className="absolute left-3 top-3 flex gap-2">
-                  <span className="rounded-full bg-black/60 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white backdrop-blur">{listing.category}</span>
-                  {listing.pro ? <span className="rounded-full bg-emerald-400/20 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-100 backdrop-blur">Pro</span> : null}
-                </div>
-                <div className="flex items-center gap-3 mt-4 pt-4 border-t border-white/5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-slate-400">
-                    <span className="material-symbols-outlined text-[16px]">call</span>
+          {filtered.map((listing) => {
+            const tenant = getTenantByProviderId(listing.id);
+            const storefrontUrl = tenant?.slug && tenant.status === "published" ? `/s/${tenant.slug}` : `/marketplace/${listing.id}/storefront`;
+            return (
+              <article key={listing.id} className="group overflow-hidden rounded-3xl border border-white/10 bg-[#111827] text-left shadow-lg transition hover:-translate-y-0.5 hover:border-violet-400/40">
+                <div className="relative h-48 overflow-hidden">
+                  <img src={listing.image} alt={listing.title} className="h-full w-full object-cover transition duration-700 group-hover:scale-105" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-transparent" />
+                  <div className="absolute left-3 top-3 flex gap-2">
+                    <span className="rounded-full bg-black/60 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white backdrop-blur">{listing.category}</span>
+                    {listing.pro ? <span className="rounded-full bg-emerald-400/20 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-100 backdrop-blur">Pro</span> : null}
                   </div>
-                  <span className="text-xs font-medium text-slate-300">
-                    Contact Provider
-                  </span>
+                  {tenant?.slug && tenant.status === "published" && (
+                    <div className="absolute right-3 top-3">
+                      <span className="rounded-full bg-violet-600 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-white shadow-lg">Storefront Live</span>
+                    </div>
+                  )}
+                  <div className="absolute bottom-3 left-3 flex items-center gap-3 rounded-full border border-white/10 bg-black/45 px-3 py-2 backdrop-blur">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-slate-400">
+                      <span className="material-symbols-outlined text-[16px]">call</span>
+                    </div>
+                    <span className="text-xs font-medium text-slate-300">Contact Provider</span>
+                  </div>
                 </div>
-              </div>
-              <div className="space-y-4 p-5">
-                <div>
-                  <h2 className="line-clamp-2 min-h-[3.5rem] text-xl font-black text-white">{listing.title}</h2>
-                  <p className="mt-1 text-sm font-semibold text-slate-300">{listing.businessName}</p>
-                  <p className="mt-1 text-xs text-slate-500">{listing.location}</p>
-                </div>
-                <p className="line-clamp-2 text-sm leading-6 text-slate-400">{listing.description}</p>
-                <div className="flex items-center justify-between border-t border-white/10 pt-4">
+                <div className="space-y-4 p-5">
                   <div>
-                    <p className="text-[10px] uppercase tracking-widest text-slate-500">From</p>
-                    <p className="text-sm font-black text-emerald-300">FCFA {Number(listing.price || listing.startingPrice || 0).toLocaleString()}</p>
+                    <h2 className="line-clamp-2 min-h-[3.5rem] text-xl font-black text-white">{listing.title}</h2>
+                    <p className="mt-1 text-sm font-semibold text-slate-300">{listing.businessName}</p>
+                    <p className="mt-1 text-xs text-slate-500">{listing.location}</p>
                   </div>
-                  <p className="text-xs font-bold text-amber-300">star {listing.rating}</p>
+                  <p className="line-clamp-2 text-sm leading-6 text-slate-400">{listing.description}</p>
+                  <div className="flex items-center justify-between border-t border-white/10 pt-4">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-widest text-slate-500">From</p>
+                      <p className="text-sm font-black text-emerald-300">FCFA {Number(listing.price || listing.startingPrice || 0).toLocaleString()}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-bold text-amber-300">star {listing.rating}</p>
+                      <p className="mt-1 text-[10px] uppercase tracking-widest text-slate-500">
+                        {getStorefrontProducts(listing.id).length} storefront items
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button type="button" onClick={() => navigate(`/marketplace/${listing.id}`)} className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-white/[0.08]">View Details</button>
+                    <button type="button" onClick={() => navigate(storefrontUrl)} className="rounded-2xl bg-gradient-to-r from-amber-300 to-orange-500 px-4 py-3 text-xs font-black uppercase tracking-widest text-black hover:opacity-90">View Storefront</button>
+                  </div>
                 </div>
-              </div>
-            </button>
-          ))}
+              </article>
+            );
+          })}
         </section>
       </div>
     </Layout>

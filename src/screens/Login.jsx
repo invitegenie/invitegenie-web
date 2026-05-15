@@ -1,26 +1,51 @@
-﻿import React, { useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+
+const PLAN_DEMO_LOGINS = [
+  {
+    label: "FREE",
+    email: "marie.user@invitegenie.cm",
+    note: "Basic events, storefront, tasker, and check-in modes",
+  },
+  {
+    label: "PRO",
+    email: "estelle.pro@invitegenie.cm",
+    note: "AI tools, higher limits, priority visibility",
+  },
+  {
+    label: "BUSINESS",
+    email: "brice.vendor@invitegenie.cm",
+    note: "Unlimited services, teams, advanced marketplace tools",
+  },
+  {
+    label: "ENTERPRISE",
+    email: "mtn.enterprise@invitegenie.cm",
+    note: "Unlimited scale and enterprise workflows",
+  },
+];
 
 export default function Login() {
   const [isSignUp, setIsSignUp] = useState(false);
   // TEMPORARY: Prefilled for development
-  const [formData, setFormData] = useState({ name: "", email: "marie.user@invitegenie.cm", password: "demo123" });
+  const [formData, setFormData] = useState({ name: "", email: "", password: "" });
   const [isProcessing, setIsProcessing] = useState(false);
   const { login, signup } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.email || (isSignUp && !formData.name)) return alert("Please fill in all required fields");
+    
+    const cleanEmail = formData.email.trim().toLowerCase();
+    if (!cleanEmail || (isSignUp && !formData.name)) return alert("Please fill in all required fields");
     
     setIsProcessing(true);
     try {
       if (isSignUp) {
-        await signup(formData.email, formData.password, formData.name);
-        alert("Magic is happening! Please check your email to confirm your account.");
+        await signup(cleanEmail, formData.password, formData.name);
+        navigate("/verify-email", { state: { email: cleanEmail }, replace: true });
       } else {
-        await login(formData.email, formData.password, { portal: "user" });
+        await login(cleanEmail, formData.password, { portal: "user" });
         navigate("/dashboard", { replace: true });
       }
     } catch (error) {
@@ -107,6 +132,8 @@ export default function Login() {
                 placeholder="user@invitegenie.com"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                autoCapitalize="none"
+                autoCorrect="off"
               />
             </div>
 
@@ -115,7 +142,7 @@ export default function Login() {
               <input
                 type="password"
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-3.5 text-sm text-white outline-none focus:ring-2 focus:ring-violet-500/50 transition-all"
-                placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                placeholder="••••••••"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               />
@@ -132,24 +159,18 @@ export default function Login() {
 
           {!isSignUp && (
             <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
-              <p className="mb-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Demo users</p>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  ["Normal", "marie.user@invitegenie.cm"],
-                  ["Pro", "estelle.pro@invitegenie.cm"],
-                  ["Vendor", "brice.vendor@invitegenie.cm"],
-                  ["Planner", "sandra.planner@invitegenie.cm"],
-                  ["Enterprise", "mtn.enterprise@invitegenie.cm"],
-                  ["Tasker", "emmanuel.tasker@invitegenie.cm"],
-                  ["Check-in", "nfor.checkin@invitegenie.cm"],
-                ].map(([label, email]) => (
+              <p className="mb-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Plan demos</p>
+              <p className="mb-3 text-xs leading-5 text-slate-500">Use one of the four account plans. Capabilities are toggled after login in Settings.</p>
+              <div className="grid gap-2">
+                {PLAN_DEMO_LOGINS.map(({ label, email, note }) => (
                   <button
                     key={email}
                     type="button"
                     onClick={() => setFormData({ ...formData, email, password: "demo123" })}
-                    className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-300 transition hover:border-violet-400/40 hover:text-white"
+                    className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-left transition hover:border-violet-400/40 hover:bg-violet-500/10"
                   >
-                    {label}
+                    <span className="block text-[10px] font-black uppercase tracking-[0.18em] text-white">{label}</span>
+                    <span className="mt-1 block text-xs leading-5 text-slate-500">{note}</span>
                   </button>
                 ))}
               </div>

@@ -1,478 +1,794 @@
-﻿import { useMemo, useState } from "react";
-import Layout from "../components/Layout";
-import * as Engine from "../auth/coreEngine";
+﻿import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import TopHeader from "./TopHeader";
+import LeftToolRail from "./LeftToolRail";
+import ObjectLibraryPanel from "./ObjectLibraryPanel";
+import ControlStrip from "./ControlStrip";
+import CanvasWorkspace from "./CanvasWorkspace";
+import InspectorPanel from "./InspectorPanel";
+import BottomPanel from "./BottomPanel";
+import MobileGenieRender from "./MobileGenieRender";
+import {
+  STORAGE_DRAFTS_KEY,
+  STORAGE_SNAPSHOTS_KEY,
+  MIN_DESKTOP_WIDTH,
+  uid,
+  previewCards,
+  initialVenueObjects,
+  makeObjectFromLibraryItem,
+  clamp,
+} from "./venueObjectCatalog";
 
-const TOOLS = [
-  { type: "table", icon: "table_restaurant", label: "Table", width: 72, height: 72, capacity: 8 },
-  { type: "seat", icon: "chair", label: "Seat", width: 44, height: 44, capacity: 1 },
-  { type: "stage", icon: "theater_comedy", label: "Stage", width: 180, height: 92, capacity: 0 },
-  { type: "bar", icon: "local_bar", label: "Bar", width: 120, height: 62, capacity: 0 },
-  { type: "zone", icon: "grid_view", label: "VIP Zone", width: 150, height: 110, capacity: 25 },
-  { type: "entrance", icon: "door_open", label: "Entrance", width: 110, height: 56, capacity: 0 },
-  { type: "dancefloor", icon: "nightlife", label: "Dance Floor", width: 170, height: 120, capacity: 60 },
-];
-
-const STATUS = {
-  available: "bg-emerald-500/15 border-emerald-400/40 text-emerald-200",
-  reserved: "bg-amber-500/15 border-amber-400/40 text-amber-200",
-  vip: "bg-violet-500/20 border-violet-400/50 text-violet-100",
-  blocked: "bg-rose-500/15 border-rose-400/40 text-rose-200",
-};
-
-const STATUS_OPTIONS = ["available", "reserved", "vip", "blocked"];
-
-export default function VenueBuilder() {
-  const [venueName, setVenueName] = useState("Mountain Club Reception Hall");
-  const [selectedTool, setSelectedTool] = useState("table");
-  const [objects, setObjects] = useState([]);
-  const [selectedId, setSelectedId] = useState(null);
-  const [history, setHistory] = useState([]);
-  const [snapToGrid, setSnapToGrid] = useState(true);
-  const [showLabels, setShowLabels] = useState(true);
-  const [canvasMode, setCanvasMode] = useState("build");
-
-  const selectedObject = objects.find((obj) => obj.id === selectedId);
-
-  const stats = useMemo(() => {
-    const capacity = objects.reduce((sum, obj) => sum + Number(obj.capacity || 0), 0);
-    const tables = objects.filter((obj) => obj.type === "table").length;
-    const seats = objects.filter((obj) => obj.type === "seat").length;
-    const vipZones = objects.filter((obj) => obj.status === "vip" || obj.type === "zone").length;
-
-    return { capacity, tables, seats, vipZones, total: objects.length };
-  }, [objects]);
-
-  function pushHistory(nextObjects = objects) {
-    setHistory((prev) => [...prev.slice(-15), nextObjects]);
-  }
-
-  function getTool(type) {
-    return TOOLS.find((tool) => tool.type === type) || TOOLS[0];
-  }
-
-  function addObject(e) {
-    if (canvasMode !== "build") return;
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    const rawX = e.clientX - rect.left;
-    const rawY = e.clientY - rect.top;
-    const x = snapToGrid ? Math.round(rawX / 20) * 20 : Math.round(rawX);
-    const y = snapToGrid ? Math.round(rawY / 20) * 20 : Math.round(rawY);
-    const tool = getTool(selectedTool);
-
-    pushHistory();
-
-    const newObject = {
-      id: `${tool.type}-${Date.now()}`,
-      type: tool.type,
-      icon: tool.icon,
-      x,
-      y,
-      width: tool.width,
-      height: tool.height,
-      rotation: 0,
-      label: `${tool.label} ${objects.filter((o) => o.type === tool.type).length + 1}`,
-      status: tool.type === "zone" ? "vip" : "available",
-      capacity: tool.capacity,
-      price: tool.type === "zone" ? 50000 : tool.type === "table" ? 25000 : 0,
-      notes: "",
-    };
-
-    setObjects((prev) => [...prev, newObject]);
-    setSelectedId(newObject.id);
-  }
-
-  function updateObject(id, updates) {
-    setObjects((prev) => prev.map((obj) => (obj.id === id ? { ...obj, ...updates } : obj)));
-  }
-
-  function deleteObject() {
-    if (!selectedId) return;
-    pushHistory();
-    setObjects((prev) => prev.filter((obj) => obj.id !== selectedId));
-    setSelectedId(null);
-  }
-
-  function duplicateObject() {
-    if (!selectedObject) return;
-    pushHistory();
-
-    const duplicate = {
-      ...selectedObject,
-      id: `${selectedObject.type}-${Date.now()}`,
-      x: selectedObject.x + 30,
-      y: selectedObject.y + 30,
-      label: `${selectedObject.label} Copy`,
-    };
-
-    setObjects((prev) => [...prev, duplicate]);
-    setSelectedId(duplicate.id);
-  }
-
-  function undo() {
-    const previous = history[history.length - 1];
-    if (!previous) return;
-
-    setObjects(previous);
-    setHistory((prev) => prev.slice(0, -1));
-    setSelectedId(null);
-  }
-
-  function resetLayout() {
-    if (!window.confirm("Clear this venue layout?")) return;
-    pushHistory();
-    setObjects([]);
-    setSelectedId(null);
-  }
-
-  function saveVenue() {
-    const venue = {
-      id: `venue-${Date.now()}`,
-      name: venueName,
-      layout: objects,
-      stats,
-      updatedAt: new Date().toISOString(),
-    };
-
-    if (typeof Engine.saveVenue === "function") {
-      Engine.saveVenue(venue);
-    } else {
-      localStorage.setItem("ig_venue_layout", JSON.stringify(venue));
-    }
-
-    alert("Venue layout saved successfully.");
-  }
-
-  function loadSampleLayout() {
-    pushHistory();
-
-    setObjects([
-      makeObject("entrance", 90, 80, "Main Entrance"),
-      makeObject("stage", 510, 90, "Main Stage"),
-      makeObject("dancefloor", 510, 250, "Dance Floor"),
-      makeObject("bar", 850, 120, "Cocktail Bar"),
-      makeObject("zone", 850, 330, "VIP Lounge", "vip"),
-      makeObject("table", 240, 280, "Table A1"),
-      makeObject("table", 340, 280, "Table A2"),
-      makeObject("table", 240, 400, "Table B1"),
-      makeObject("table", 340, 400, "Table B2"),
-      makeObject("table", 640, 400, "Table C1"),
-      makeObject("table", 740, 400, "Table C2"),
-    ]);
-  }
-
-  function makeObject(type, x, y, label, status = "available") {
-    const tool = getTool(type);
-
-    return {
-      id: `${type}-${Math.random().toString(36).slice(2)}`,
-      type,
-      icon: tool.icon,
-      x,
-      y,
-      width: tool.width,
-      height: tool.height,
-      rotation: 0,
-      label,
-      status,
-      capacity: tool.capacity,
-      price: type === "zone" ? 50000 : type === "table" ? 25000 : 0,
-      notes: "",
-    };
-  }
-
-  return (
-    <Layout>
-      <div className="mx-auto max-w-[1500px] space-y-5 pb-24">
-        <header className="flex flex-col gap-4 rounded-2xl border border-white/5 bg-white/[0.035] p-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <input
-              value={venueName}
-              onChange={(e) => setVenueName(e.target.value)}
-              className="w-full bg-transparent text-2xl font-semibold text-gray-100 outline-none"
-            />
-            <p className="mt-1 text-sm text-gray-500">
-              Design seating plans, VIP zones, tables, stages, bars and access areas.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <button onClick={undo} className="btn-secondary" disabled={!history.length}>
-              Undo
-            </button>
-            <button onClick={loadSampleLayout} className="btn-secondary">
-              Load Sample
-            </button>
-            <button onClick={resetLayout} className="btn-secondary">
-              Reset
-            </button>
-            <button onClick={saveVenue} className="btn-primary">
-              Save Venue
-            </button>
-          </div>
-        </header>
-
-        <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Stat label="Objects" value={stats.total} icon="widgets" />
-          <Stat label="Capacity" value={stats.capacity} icon="groups" />
-          <Stat label="Tables" value={stats.tables} icon="table_restaurant" />
-          <Stat label="VIP Areas" value={stats.vipZones} icon="workspace_premium" />
-        </section>
-
-        <div className="grid min-h-[760px] grid-cols-1 gap-5 xl:grid-cols-[230px_minmax(0,1fr)_320px]">
-          <aside className="rounded-2xl border border-white/5 bg-white/[0.035] p-4">
-            <div className="mb-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                Layout Tools
-              </p>
-              <p className="mt-1 text-xs text-gray-500">Select an item, then click the canvas.</p>
-            </div>
-
-            <div className="space-y-2">
-              {TOOLS.map((tool) => (
-                <button
-                  key={tool.type}
-                  onClick={() => {
-                    setSelectedTool(tool.type);
-                    setCanvasMode("build");
-                  }}
-                  className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition ${
-                    selectedTool === tool.type && canvasMode === "build"
-                      ? "border-violet-400/50 bg-violet-500/15 text-violet-100"
-                      : "border-white/5 bg-white/[0.025] text-gray-400 hover:bg-white/[0.05]"
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[20px]">{tool.icon}</span>
-                  <div>
-                    <p className="text-sm font-medium">{tool.label}</p>
-                    <p className="text-xs text-gray-500">{tool.width}Ã—{tool.height}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-5 space-y-3 border-t border-white/5 pt-5">
-              <Toggle label="Snap to grid" checked={snapToGrid} onChange={setSnapToGrid} />
-              <Toggle label="Show labels" checked={showLabels} onChange={setShowLabels} />
-            </div>
-          </aside>
-
-          <main className="relative overflow-hidden rounded-3xl border border-white/5 bg-[#0c0d12] shadow-sm">
-            <div className="absolute left-5 top-5 z-20 rounded-2xl border border-white/5 bg-black/50 px-4 py-3 backdrop-blur">
-              <p className="text-xs font-medium text-gray-300">
-                Mode: <span className="text-violet-300">{canvasMode === "build" ? "Build" : "Select/Edit"}</span>
-              </p>
-              <p className="text-xs text-gray-500">Click canvas to place selected object.</p>
-            </div>
-
-            <div
-              className="absolute inset-0 opacity-[0.14]"
-              style={{
-                backgroundImage:
-                  "linear-gradient(rgba(255,255,255,.14) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.14) 1px, transparent 1px)",
-                backgroundSize: "20px 20px",
-              }}
-            />
-
-            <div className="absolute inset-0 cursor-crosshair" onClick={addObject}>
-              {objects.map((obj) => {
-                const selected = selectedId === obj.id;
-
-                return (
-                  <button
-                    key={obj.id}
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedId(obj.id);
-                      setCanvasMode("select");
-                    }}
-                    style={{
-                      left: obj.x,
-                      top: obj.y,
-                      width: obj.width,
-                      height: obj.height,
-                      transform: `translate(-50%, -50%) rotate(${obj.rotation || 0}deg)`,
-                    }}
-                    className={`absolute flex flex-col items-center justify-center rounded-xl border text-center transition hover:scale-105 ${
-                      STATUS[obj.status] || STATUS.available
-                    } ${selected ? "ring-2 ring-violet-300 ring-offset-2 ring-offset-[#0c0d12]" : ""}`}
-                  >
-                    <span className="material-symbols-outlined text-[22px]">{obj.icon}</span>
-                    {showLabels ? (
-                      <span className="mt-1 max-w-full truncate px-1 text-[9px] font-semibold uppercase">
-                        {obj.label}
-                      </span>
-                    ) : null}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="absolute bottom-5 left-5 right-5 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/5 bg-black/55 p-3 backdrop-blur">
-              <div className="flex flex-wrap gap-3">
-                {STATUS_OPTIONS.map((item) => (
-                  <div key={item} className="flex items-center gap-2 text-xs text-gray-400">
-                    <span className={`h-2.5 w-2.5 rounded-full ${STATUS[item].split(" ")[0]}`} />
-                    {item}
-                  </div>
-                ))}
-              </div>
-
-              <p className="text-xs text-gray-500">Click items to edit details.</p>
-            </div>
-          </main>
-
-          <aside className="rounded-2xl border border-white/5 bg-white/[0.035] p-4">
-            <div className="mb-5">
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                Inspector
-              </p>
-              <h2 className="mt-1 text-lg font-semibold text-gray-100">
-                {selectedObject ? selectedObject.label : "No object selected"}
-              </h2>
-            </div>
-
-            {selectedObject ? (
-              <div className="space-y-4">
-                <Field
-                  label="Label"
-                  value={selectedObject.label}
-                  onChange={(value) => updateObject(selectedObject.id, { label: value })}
-                />
-
-                <div className="grid grid-cols-2 gap-3">
-                  <Field
-                    label="Capacity"
-                    type="number"
-                    value={selectedObject.capacity}
-                    onChange={(value) => updateObject(selectedObject.id, { capacity: Number(value) })}
-                  />
-                  <Field
-                    label="Price FCFA"
-                    type="number"
-                    value={selectedObject.price}
-                    onChange={(value) => updateObject(selectedObject.id, { price: Number(value) })}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <Field
-                    label="Width"
-                    type="number"
-                    value={selectedObject.width}
-                    onChange={(value) => updateObject(selectedObject.id, { width: Number(value) })}
-                  />
-                  <Field
-                    label="Height"
-                    type="number"
-                    value={selectedObject.height}
-                    onChange={(value) => updateObject(selectedObject.id, { height: Number(value) })}
-                  />
-                </div>
-
-                <Field
-                  label="Rotation"
-                  type="number"
-                  value={selectedObject.rotation || 0}
-                  onChange={(value) => updateObject(selectedObject.id, { rotation: Number(value) })}
-                />
-
-                <label className="block">
-                  <span className="mb-2 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Status
-                  </span>
-                  <select
-                    value={selectedObject.status}
-                    onChange={(e) => updateObject(selectedObject.id, { status: e.target.value })}
-                    className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-gray-200 outline-none"
-                  >
-                    {STATUS_OPTIONS.map((status) => (
-                      <option key={status} value={status}>
-                        {status}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="block">
-                  <span className="mb-2 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Notes
-                  </span>
-                  <textarea
-                    value={selectedObject.notes}
-                    onChange={(e) => updateObject(selectedObject.id, { notes: e.target.value })}
-                    rows={4}
-                    className="w-full resize-none rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-gray-200 outline-none"
-                    placeholder="Reserved for family, VIP sponsors, service access..."
-                  />
-                </label>
-
-                <div className="grid grid-cols-2 gap-3 pt-2">
-                  <button onClick={duplicateObject} className="btn-secondary">
-                    Duplicate
-                  </button>
-                  <button onClick={deleteObject} className="btn-danger">
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-5 text-center">
-                <span className="material-symbols-outlined text-4xl text-gray-600">ads_click</span>
-                <p className="mt-3 text-sm font-medium text-gray-300">Select an object</p>
-                <p className="mt-1 text-xs text-gray-500">
-                  Click any table, seat, bar or zone on the canvas to edit details.
-                </p>
-              </div>
-            )}
-          </aside>
-        </div>
-      </div>
-    </Layout>
+function useIsDesktop() {
+  const getInitialValue = () => (
+    typeof window === "undefined" ? true : window.innerWidth >= MIN_DESKTOP_WIDTH
   );
+  const [isDesktop, setIsDesktop] = useState(getInitialValue);
+
+  useEffect(() => {
+    const onResize = () => setIsDesktop(window.innerWidth >= MIN_DESKTOP_WIDTH);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  return isDesktop;
 }
 
-function Stat({ label, value, icon }) {
+function normalizeSelectedIds(value) {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  return value ? [value] : [];
+}
+
+export default function VenueBuilder() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const eventId = searchParams.get("eventId");
+  const isDesktop = useIsDesktop();
+
+  const [saveStatus, setSaveStatus] = useState("Unsaved");
+  const [venueSize, setVenueSize] = useState({ w: 1200, h: 1000 });
+  const [zoom, setZoom] = useState(0.5);
+  const [showGrid, setShowGrid] = useState(true);
+  const [snapToGrid, setSnapToGrid] = useState(true);
+  const [gridSize, setGridSize] = useState(40);
+  const [activeTool, setActiveTool] = useState("select");
+  const [activeRenderMode, setActiveRenderMode] = useState("2d");
+  const [canvasPan, setCanvasPan] = useState({ x: 0, y: 0 });
+  const [objects, setObjects] = useState(initialVenueObjects);
+  const [selectedObjectIds, setSelectedObjectIds] = useState(["table-9"]);
+  const [highlightedObjectIds, setHighlightedObjectIds] = useState([]);
+  const [history, setHistory] = useState({ past: [], future: [] });
+  const [sceneMetadata, setSceneMetadata] = useState(null);
+  const [snapshots, setSnapshots] = useState([]);
+
+  const stats = useMemo(() => {
+    const totalTables = objects.filter((object) => object.type === "roundTable").length;
+    const totalSeats = objects.reduce((sum, object) => sum + (object.metadata?.seats || 0), 0);
+    return {
+      totalTables,
+      totalSeats,
+      totalObjects: objects.length,
+      venueLabel: `${venueSize.w}x${venueSize.h} cm`,
+    };
+  }, [objects, venueSize]);
+
+  const commitHistory = () => {
+    setHistory((prev) => ({ past: [...prev.past.slice(-49), objects], future: [] }));
+  };
+
+  const undo = () => {
+    setHistory((prev) => {
+      if (!prev.past.length) return prev;
+      const previous = prev.past[prev.past.length - 1];
+      setObjects(previous);
+      return { past: prev.past.slice(0, -1), future: [objects, ...prev.future] };
+    });
+  };
+
+  const redo = () => {
+    setHistory((prev) => {
+      if (!prev.future.length) return prev;
+      const next = prev.future[0];
+      setObjects(next);
+      return { past: [...prev.past, objects], future: prev.future.slice(1) };
+    });
+  };
+
+  const latestState = useRef({ selectedObjectIds, undo, redo, commitHistory });
+
+  useEffect(() => {
+    latestState.current = { selectedObjectIds, undo, redo, commitHistory };
+  });
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_SNAPSHOTS_KEY);
+      if (saved) setSnapshots(JSON.parse(saved));
+    } catch (error) {
+      console.error(error);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (["INPUT", "TEXTAREA", "SELECT"].includes(event.target?.tagName)) return;
+
+      const {
+        selectedObjectIds: latestSelection,
+        undo: latestUndo,
+        redo: latestRedo,
+        commitHistory: latestCommitHistory,
+      } = latestState.current;
+
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
+        event.preventDefault();
+        if (event.shiftKey) latestRedo();
+        else latestUndo();
+      } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") {
+        event.preventDefault();
+        latestRedo();
+      } else if (event.key === "Delete" || event.key === "Backspace") {
+        if (latestSelection.length > 0) {
+          event.preventDefault();
+          latestCommitHistory();
+          setObjects((prev) => prev.filter((object) => !latestSelection.includes(object.id)));
+          setSelectedObjectIds([]);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  const handleSelect = (id, multi) => {
+    setSelectedObjectIds((prev) => {
+      if (multi) return prev.includes(id) ? prev.filter((currentId) => currentId !== id) : [...prev, id];
+      return [id];
+    });
+  };
+
+  const handleApplyTemplate = (template) => {
+    if (window.confirm(`Apply the "${template.title}" template? This will replace your current layout.`)) {
+      commitHistory();
+      setVenueSize(template.venueSize);
+      const newObjects = template.getObjects(template.venueSize.w, template.venueSize.h);
+      setObjects(newObjects);
+      setSelectedObjectIds([newObjects[0]?.id].filter(Boolean));
+      setActiveRenderMode("2d");
+    }
+  };
+
+  const saveSnapshot = () => {
+    const newSnapshot = {
+      id: uid("snap"),
+      venueId: eventId || "demo",
+      renderMode: activeRenderMode,
+      title: `${previewCards.find((card) => card.id === activeRenderMode)?.title || "Layout"} Snapshot`,
+      thumbnailType: activeRenderMode,
+      objectsSnapshot: JSON.parse(JSON.stringify(objects)),
+      venueSize: { ...venueSize },
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [newSnapshot, ...snapshots];
+    setSnapshots(updated);
+    localStorage.setItem(STORAGE_SNAPSHOTS_KEY, JSON.stringify(updated));
+  };
+
+  const deleteSnapshot = (id) => {
+    const updated = snapshots.filter((snapshot) => snapshot.id !== id);
+    setSnapshots(updated);
+    localStorage.setItem(STORAGE_SNAPSHOTS_KEY, JSON.stringify(updated));
+  };
+
+  const restoreSnapshot = (snapshot) => {
+    commitHistory();
+    setActiveRenderMode(snapshot.renderMode);
+    setObjects(snapshot.objectsSnapshot);
+    setVenueSize(snapshot.venueSize);
+  };
+
+  const addObjectFromLibrary = (libraryItem) => {
+    commitHistory();
+    const object = makeObjectFromLibraryItem(libraryItem, venueSize);
+    setObjects((prev) => [...prev, object]);
+    setSelectedObjectIds([object.id]);
+  };
+
+  const fitToScreen = () => {
+    const availableWidth = window.innerWidth - (250 + 46 + 285);
+    const availableHeight = window.innerHeight - (52 + 50 + 172);
+    const nextZoom = clamp(
+      Math.min((availableWidth - 60) / venueSize.w, (availableHeight - 60) / venueSize.h),
+      0.1,
+      3,
+    );
+    setZoom(Number(nextZoom.toFixed(2)));
+    setCanvasPan({ x: 0, y: 0 });
+  };
+
+  useEffect(() => {
+    setZoom(0.5);
+    setCanvasPan({ x: 0, y: 0 });
+  }, []);
+
+  const handleExportPDF = () => {
+    try {
+      const printScale = Math.min(1050 / venueSize.w, 750 / venueSize.h);
+      const style = document.createElement("style");
+      style.innerHTML = `
+        @media print {
+          body * { visibility: hidden; }
+          #printable-canvas, #printable-canvas * { visibility: visible; }
+          #printable-canvas {
+            position: fixed !important;
+            left: 50% !important;
+            top: 50% !important;
+            transform: translate(-50%, -50%) scale(${printScale}) !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+            box-shadow: none !important;
+          }
+          @page { size: landscape; margin: 0mm; }
+        }
+      `;
+      document.head.appendChild(style);
+      const prevMode = activeRenderMode;
+      const prevSelected = selectedObjectIds;
+      if (activeRenderMode === "iso" || activeRenderMode === "walk") setActiveRenderMode("2d");
+      setSelectedObjectIds([]);
+      
+      setTimeout(() => {
+        window.print();
+        if (document.head.contains(style)) {
+          document.head.removeChild(style);
+        }
+        setActiveRenderMode(prevMode);
+        setSelectedObjectIds(prevSelected);
+      }, 300);
+    } catch (error) {
+      console.error("PDF Export failed:", error);
+      window.alert("Failed to export layout. Please try again.");
+    }
+  };
+
+  const aiActions = {
+    generate: (promptText) => {
+      commitHistory();
+      const text = (typeof promptText === "string" ? promptText : "").toLowerCase();
+      const isConcert = text.includes("concert");
+      const isConference = text.includes("conference");
+      const guestMatch = text.match(/(\d+)\s*guest/);
+      const guestCount = guestMatch ? parseInt(guestMatch[1], 10) : (isConcert ? 500 : isConference ? 200 : 150);
+      const tableCount = isConcert ? 0 : Math.ceil(guestCount / 8);
+
+      setSceneMetadata({
+        eventType: isConcert ? "concert" : isConference ? "conference" : "wedding",
+        guestCount,
+        tableCount,
+        theme: text.includes("luxury") ? "luxury" : "standard",
+        lightingZones: isConcert ? 4 : 2,
+        vendorZones: isConference ? 5 : 2,
+      });
+
+      const generated = [
+        {
+          id: uid("ai-stage"),
+          type: "stage",
+          name: isConcert ? "Massive Concert Stage" : "Main Stage",
+          x: venueSize.w * 0.3,
+          y: 20,
+          width: venueSize.w * 0.4,
+          height: 150,
+          color: "#6D28D9",
+          rotation: 0,
+          zIndex: 20,
+          metadata: {
+            vendorCategory: "Production",
+            costEstimate: isConcert ? 800000 : 250000,
+            capacity: 20,
+            renderStyle: isConcert ? "concert" : "classic",
+            material: "steel_truss",
+            lighting: "purple_wash",
+            importance: "high",
+            zone: "entertainment",
+          },
+        },
+      ];
+
+      if (!isConcert) {
+        if (!isConference) {
+          generated.push({
+            id: uid("ai-dance"),
+            type: "danceFloor",
+            name: "Dance Floor",
+            x: venueSize.w * 0.42,
+            y: 200,
+            width: 220,
+            height: 165,
+            color: "#8B5A2B",
+            rotation: 0,
+            zIndex: 12,
+            metadata: {
+              vendorCategory: "Rentals",
+              costEstimate: 80000,
+              capacity: 50,
+              renderStyle: "led_panel",
+              material: "acrylic",
+              lighting: "dynamic_chase",
+              importance: "medium",
+              zone: "entertainment",
+            },
+          });
+        }
+
+        generated.push({
+          id: uid("ai-vip"),
+          type: "headTable",
+          name: "VIP Table",
+          x: venueSize.w * 0.36,
+          y: 390,
+          width: 320,
+          height: 52,
+          color: "#F7D77E",
+          rotation: 0,
+          zIndex: 14,
+          metadata: {
+            vendorCategory: "Furniture",
+            costEstimate: 50000,
+            capacity: 12,
+            renderStyle: "luxury",
+            material: "glass_gold",
+            lighting: "warm_spot",
+            importance: "high",
+            zone: "vip",
+          },
+        });
+
+        Array.from({ length: tableCount }).forEach((_, index) => {
+          const leftSide = index < Math.ceil(tableCount / 2);
+          const col = index % 3;
+          const row = Math.floor((index % Math.ceil(tableCount / 2)) / 3);
+          generated.push({
+            id: uid(`ai-table-${index}`),
+            type: "roundTable",
+            name: `Table ${index + 1}`,
+            x: leftSide ? 120 + col * 145 : venueSize.w - 430 + col * 145,
+            y: 480 + row * 150,
+            width: 96,
+            height: 96,
+            color: "#F8FAFC",
+            rotation: 0,
+            zIndex: 16,
+            metadata: {
+              seats: 8,
+              tableNumber: `AI-${index + 1}`,
+              vendorCategory: "Furniture",
+              costEstimate: 35000,
+              capacity: 8,
+              renderStyle: "classic",
+              material: "linen",
+              lighting: "ambient",
+              importance: "medium",
+              zone: "seating",
+            },
+          });
+        });
+      } else {
+        generated.push({
+          id: uid("ai-standing"),
+          type: "carpet",
+          name: "Standing VIP Area",
+          x: venueSize.w * 0.25,
+          y: 200,
+          width: venueSize.w * 0.5,
+          height: 300,
+          color: "#DC2626",
+          rotation: 0,
+          zIndex: 10,
+          metadata: {
+            vendorCategory: "Rentals",
+            costEstimate: 120000,
+            capacity: 300,
+            renderStyle: "barrier",
+            material: "metal",
+            lighting: "none",
+            importance: "high",
+            zone: "seating",
+          },
+        });
+      }
+
+      generated.push({
+        id: uid("ai-bar"),
+        type: "bar",
+        name: "Cocktail Bar",
+        x: venueSize.w * 0.78,
+        y: 170,
+        width: 165,
+        height: 52,
+        color: "#F7D77E",
+        rotation: 0,
+        zIndex: 12,
+        metadata: {
+          vendorCategory: "Catering",
+          costEstimate: 95000,
+          capacity: 5,
+          renderStyle: "modern",
+          material: "wood_led",
+          lighting: "backlit",
+          importance: "high",
+          zone: "service",
+        },
+      });
+
+      if (!isConcert) {
+        generated.push({
+          id: uid("ai-buffet"),
+          type: "buffet",
+          name: "Grand Buffet",
+          x: venueSize.w * 0.04,
+          y: 280,
+          width: 65,
+          height: 220,
+          color: "#F7D77E",
+          rotation: 0,
+          zIndex: 12,
+          metadata: {
+            vendorCategory: "Catering",
+            costEstimate: 120000,
+            capacity: 0,
+            renderStyle: "elegant",
+            material: "linen_silver",
+            lighting: "warm_wash",
+            importance: "high",
+            zone: "service",
+          },
+        });
+      }
+
+      generated.push({
+        id: uid("ai-entry"),
+        type: "entrance",
+        name: "Grand Entrance",
+        x: venueSize.w * 0.46,
+        y: venueSize.h - 100,
+        width: 115,
+        height: 80,
+        color: "#B91C1C",
+        rotation: 0,
+        zIndex: 12,
+        metadata: {
+          vendorCategory: "Decor",
+          costEstimate: 40000,
+          capacity: 0,
+          renderStyle: "floral",
+          material: "roses_greenery",
+          lighting: "spotlight",
+          importance: "high",
+          zone: "entry",
+        },
+      });
+
+      setObjects(generated);
+      setSelectedObjectIds([generated[0]?.id].filter(Boolean));
+    },
+    optimize: () => {
+      commitHistory();
+      setObjects((prev) => prev.map((object) => (
+        object.type === "roundTable"
+          ? { ...object, x: Math.round(object.x / 40) * 40, y: Math.round(object.y / 40) * 40 }
+          : object
+      )));
+    },
+    fix: () => {
+      commitHistory();
+      setObjects((prev) => (prev.some((object) => object.type === "exit") ? prev : [
+        ...prev,
+        {
+          id: uid("ai-exit-1"),
+          type: "exit",
+          name: "Emergency Exit",
+          x: 40,
+          y: 40,
+          width: 120,
+          height: 70,
+          color: "#16A34A",
+          rotation: 0,
+          zIndex: 12,
+          metadata: {
+            vendorCategory: "Safety",
+            costEstimate: 5000,
+            renderStyle: "standard",
+            material: "metal",
+            lighting: "illuminated",
+            importance: "critical",
+            zone: "safety",
+          },
+        },
+        {
+          id: uid("ai-exit-2"),
+          type: "exit",
+          name: "Emergency Exit",
+          x: venueSize.w - 160,
+          y: 40,
+          width: 120,
+          height: 70,
+          color: "#16A34A",
+          rotation: 0,
+          zIndex: 12,
+          metadata: {
+            vendorCategory: "Safety",
+            costEstimate: 5000,
+            renderStyle: "standard",
+            material: "metal",
+            lighting: "illuminated",
+            importance: "critical",
+            zone: "safety",
+          },
+        },
+      ]));
+    },
+    addVendors: () => {
+      commitHistory();
+      setObjects((prev) => [
+        ...prev,
+        {
+          id: uid("ai-vendor-1"),
+          type: "vendorBooth",
+          name: "Snack Stall",
+          x: 40,
+          y: venueSize.h - 200,
+          width: 140,
+          height: 90,
+          color: "#F59E0B",
+          rotation: 0,
+          zIndex: 15,
+          metadata: {
+            vendorCategory: "Food",
+            costEstimate: 25000,
+            capacity: 3,
+            renderStyle: "canopy",
+            material: "wood_canvas",
+            lighting: "string_lights",
+            importance: "medium",
+            zone: "vendor",
+          },
+        },
+      ]);
+    },
+    addDecor: () => {
+      commitHistory();
+      setObjects((prev) => [
+        ...prev,
+        {
+          id: uid("ai-decor"),
+          type: "arch",
+          name: "Floral Arch",
+          x: venueSize.w * 0.46,
+          y: venueSize.h - 220,
+          width: 115,
+          height: 125,
+          color: "#22C55E",
+          rotation: 0,
+          zIndex: 18,
+          metadata: {
+            vendorCategory: "Florist",
+            costEstimate: 45000,
+            renderStyle: "lush",
+            material: "fresh_flowers",
+            lighting: "none",
+            importance: "high",
+            zone: "decor",
+          },
+        },
+      ]);
+    },
+    addLighting: () => {
+      commitHistory();
+      setObjects((prev) => [
+        ...prev,
+        {
+          id: uid("ai-light-1"),
+          type: "lightingTower",
+          name: "Light Tower",
+          x: 80,
+          y: 100,
+          width: 70,
+          height: 70,
+          color: "#FDE047",
+          rotation: 0,
+          zIndex: 30,
+          metadata: {
+            vendorCategory: "Production",
+            costEstimate: 12000,
+            renderStyle: "truss",
+            material: "aluminum",
+            lighting: "spot",
+            importance: "high",
+            zone: "lighting",
+          },
+        },
+      ]);
+    },
+    handleFix: (action) => {
+      commitHistory();
+      if (action === "addSeating") {
+        setObjects((prev) => [
+          ...prev,
+          { id: uid("fix-table"), type: "roundTable", name: "Extra Table", x: 100, y: 100, width: 96, height: 96, color: "#F8FAFC", rotation: 0, zIndex: 16, metadata: { seats: 8 } },
+        ]);
+      } else if (action === "addEntrance") {
+        setObjects((prev) => [
+          ...prev,
+          { id: uid("fix-entry"), type: "entrance", name: "Main Entrance", x: venueSize.w / 2 - 50, y: venueSize.h - 100, width: 115, height: 80, color: "#B91C1C", rotation: 0, zIndex: 12, metadata: {} },
+        ]);
+      } else if (action === "addBar") {
+        setObjects((prev) => [
+          ...prev,
+          { id: uid("fix-bar"), type: "bar", name: "Bar Station", x: venueSize.w - 200, y: 100, width: 165, height: 52, color: "#F7D77E", rotation: 0, zIndex: 12, metadata: {} },
+        ]);
+      } else if (action === "addBuffet") {
+        setObjects((prev) => [
+          ...prev,
+          { id: uid("fix-buffet"), type: "buffet", name: "Food Station", x: 100, y: 100, width: 65, height: 220, color: "#F7D77E", rotation: 0, zIndex: 12, metadata: {} },
+        ]);
+      } else if (action === "addExit") {
+        aiActions.fix();
+      } else if (action === "addToilet") {
+        setObjects((prev) => [
+          ...prev,
+          { id: uid("fix-toilet"), type: "toilet", name: "Restrooms", x: venueSize.w - 150, y: venueSize.h - 150, width: 110, height: 90, color: "#0EA5E9", rotation: 0, zIndex: 12, metadata: {} },
+        ]);
+      } else if (action === "addGenerator") {
+        setObjects((prev) => [
+          ...prev,
+          { id: uid("fix-gen"), type: "generator", name: "Power Generator", x: 50, y: venueSize.h - 150, width: 140, height: 85, color: "#374151", rotation: 0, zIndex: 12, metadata: {} },
+        ]);
+      } else if (action === "addVendors") {
+        aiActions.addVendors();
+      } else if (action === "optimize") {
+        aiActions.optimize();
+      }
+    },
+  };
+
+  const handleSaveDraft = () => {
+    setSaveStatus("Saving");
+    setTimeout(() => {
+      const id = eventId || "demo-draft";
+      const draft = {
+        id,
+        eventId: id,
+        title: "Venue Draft",
+        venueSize,
+        objects,
+        selectedObjectIds,
+        zoom,
+        canvasPan,
+        updatedAt: new Date().toISOString(),
+      };
+      const drafts = JSON.parse(localStorage.getItem(STORAGE_DRAFTS_KEY) || "{}");
+      drafts[id] = { ...draft, createdAt: drafts[id]?.createdAt || draft.updatedAt };
+      localStorage.setItem(STORAGE_DRAFTS_KEY, JSON.stringify(drafts));
+      setSaveStatus("Draft Saved");
+      setTimeout(() => setSaveStatus("Unsaved"), 3000);
+    }, 500);
+  };
+
+  const handleLoadDrafts = () => {
+    try {
+      const drafts = JSON.parse(localStorage.getItem(STORAGE_DRAFTS_KEY) || "{}");
+      const draftList = Object.values(drafts);
+      const draft = drafts[eventId || "demo-draft"] || draftList.sort((a, b) => (
+        new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0)
+      ))[0];
+
+      if (!draft) {
+        window.alert("No saved venue draft found.");
+        return;
+      }
+
+      commitHistory();
+      setVenueSize(draft.venueSize || { w: 1200, h: 1000 });
+      setObjects(Array.isArray(draft.objects) ? draft.objects : initialVenueObjects);
+      setSelectedObjectIds(normalizeSelectedIds(draft.selectedObjectIds || draft.selectedObjectId));
+      if (typeof draft.zoom === "number") setZoom(draft.zoom);
+      if (draft.canvasPan) setCanvasPan(draft.canvasPan);
+      setSaveStatus("Draft Loaded");
+      setTimeout(() => setSaveStatus("Unsaved"), 3000);
+    } catch (error) {
+      console.error(error);
+      window.alert("Unable to load venue draft.");
+    }
+  };
+
+  if (!isDesktop) return <MobileGenieRender eventId={eventId} />;
+
   return (
-    <div className="rounded-2xl border border-white/5 bg-white/[0.035] p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <span className="material-symbols-outlined text-violet-300">{icon}</span>
-        <span className="text-xs text-gray-500">Live</span>
+    <div className="h-screen overflow-hidden bg-[#050812] text-white">
+      <div className="flex h-full flex-col">
+        <TopHeader
+          stats={stats}
+          onUndo={undo}
+          onRedo={redo}
+          canUndo={history.past.length > 0}
+          canRedo={history.future.length > 0}
+          onAiGenerate={() => aiActions.generate()}
+          onExportPDF={handleExportPDF}
+          onSaveDraft={handleSaveDraft}
+          onLoadDrafts={handleLoadDrafts}
+          saveStatus={saveStatus}
+          onBack={() => navigate(-1)}
+        />
+        <div className="flex min-h-0 flex-1">
+          <LeftToolRail activeTool={activeTool} setActiveTool={setActiveTool} />
+          <ObjectLibraryPanel addObjectFromLibrary={addObjectFromLibrary} applyTemplate={handleApplyTemplate} />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <ControlStrip
+              venueSize={venueSize}
+              setVenueSize={setVenueSize}
+              zoom={zoom}
+              setZoom={setZoom}
+              fitToScreen={fitToScreen}
+              showGrid={showGrid}
+              setShowGrid={setShowGrid}
+              snapToGrid={snapToGrid}
+              setSnapToGrid={setSnapToGrid}
+              gridSize={gridSize}
+              setGridSize={setGridSize}
+              activeTool={activeTool}
+              setActiveTool={setActiveTool}
+            />
+            <CanvasWorkspace
+              venueSize={venueSize}
+              zoom={zoom}
+              setZoom={setZoom}
+              showGrid={showGrid}
+              gridSize={gridSize}
+              activeTool={activeTool}
+              setActiveTool={setActiveTool}
+              canvasPan={canvasPan}
+              setCanvasPan={setCanvasPan}
+              objects={objects}
+              setObjects={setObjects}
+              selectedObjectIds={selectedObjectIds}
+              setSelectedObjectIds={setSelectedObjectIds}
+              highlightedObjectIds={highlightedObjectIds}
+              onSelect={handleSelect}
+              snapToGrid={snapToGrid}
+              commitHistory={commitHistory}
+              activeRenderMode={activeRenderMode}
+              setActiveRenderMode={setActiveRenderMode}
+            />
+          </div>
+          <InspectorPanel
+            selectedObjectIds={selectedObjectIds}
+            setSelectedObjectIds={setSelectedObjectIds}
+            onSelect={handleSelect}
+            objects={objects}
+            setObjects={setObjects}
+            commitHistory={commitHistory}
+          />
+        </div>
+        <BottomPanel
+          objects={objects}
+          setObjects={setObjects}
+          venueSize={venueSize}
+          aiActions={aiActions}
+          activeRenderMode={activeRenderMode}
+          setActiveRenderMode={setActiveRenderMode}
+          snapshots={snapshots}
+          saveSnapshot={saveSnapshot}
+          deleteSnapshot={deleteSnapshot}
+          restoreSnapshot={restoreSnapshot}
+          sceneMetadata={sceneMetadata}
+          setSelectedObjectIds={setSelectedObjectIds}
+          setHighlightedObjectIds={setHighlightedObjectIds}
+        />
       </div>
-      <p className="text-2xl font-semibold text-gray-100">{value}</p>
-      <p className="text-xs text-gray-500">{label}</p>
     </div>
   );
 }
-
-function Field({ label, value, onChange, type = "text" }) {
-  return (
-    <label className="block">
-      <span className="mb-2 block text-xs font-medium uppercase tracking-wide text-gray-500">
-        {label}
-      </span>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-gray-200 outline-none focus:border-violet-400/50"
-      />
-    </label>
-  );
-}
-
-function Toggle({ label, checked, onChange }) {
-  return (
-    <label className="flex items-center justify-between gap-3 text-sm text-gray-300">
-      {label}
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="h-4 w-4 accent-violet-500"
-      />
-    </label>
-  );
-}
-

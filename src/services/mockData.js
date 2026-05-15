@@ -1,5 +1,13 @@
 import { getDemoUsers } from "./demoUsers";
 import { hasPermission } from "./permissions";
+import {
+  appendEventToStorage,
+  readEventsFromStorage,
+  updateEventInStorage,
+  writeEventsToStorage,
+} from "./eventStoreService";
+import { saveBookedVendors, getBookedVendors } from "./eventVendorService";
+import { saveSponsors, getSponsors } from "./eventSponsorService";
 
 export const DEMO_STORAGE_KEYS = {
   users: "demo_users",
@@ -23,8 +31,16 @@ export const DEMO_STORAGE_KEYS = {
   vendorAdminActions: "demo_vendor_admin_actions",
   vendorInsights: "demo_vendor_insights",
   vendorGenieHistory: "demo_vendor_genie_history",
+  aiMarketingHistory: "demo_ai_marketing_history",
+  aiMarketingUsage: "demo_ai_marketing_usage",
+  brandVoiceProfiles: "demo_brand_voice_profiles",
+  competitorPricing: "demo_competitor_pricing",
+  savedCampaigns: "demo_saved_campaigns",
   walletTransactions: "demo_wallet_transactions",
   linkedAccounts: "demo_linked_accounts",
+  subscriptions: "demo_subscriptions",
+  taskers: "demo_taskers",
+  capabilities: "demo_capabilities",
 };
 
 const createdAt = "2026-05-01T12:00:00.000Z";
@@ -88,6 +104,8 @@ function event(id, title, category, location, date, time, price, totalTickets, t
     currency: "FCFA",
     status: "ACTIVE",
     image,
+    visibility: "public",
+    accessMode: "instant_ticket",
     coverImage: image,
     hostId,
     vendorId: hostId,
@@ -398,10 +416,8 @@ function generateLikes(memories) {
   );
 }
 
-function syncLegacyKeys({ events, tickets, payments, memories, listings, posts, comments }) {
+function syncLegacyKeys({ tickets, payments, memories, listings, posts, comments }) {
   const legacy = [
-    ["ig_events", events],
-    ["invitegenie_events", events],
     ["ig_tickets", tickets],
     ["invitegenie_bookings", tickets],
     ["ig_payments", payments],
@@ -434,7 +450,7 @@ export function ensureDemoData() {
 
   const users = getDemoUsers();
   const seededEvents = [...MOCK_EVENTS, ...generateRoleOwnedEvents(users)];
-  const events = localStorage.getItem(DEMO_STORAGE_KEYS.events) ? readKey(DEMO_STORAGE_KEYS.events) : writeKey(DEMO_STORAGE_KEYS.events, seededEvents);
+  const events = readEventsFromStorage(seededEvents);
   const seededListings = [...MOCK_PROVIDERS, ...generateRoleOwnedListings(users)];
   const listings = localStorage.getItem(DEMO_STORAGE_KEYS.marketplaceListings)
     ? readKey(DEMO_STORAGE_KEYS.marketplaceListings)
@@ -481,6 +497,44 @@ export function ensureDemoData() {
 
   if (!localStorage.getItem(DEMO_STORAGE_KEYS.marketplaceOrders)) writeKey(DEMO_STORAGE_KEYS.marketplaceOrders, []);
   if (!localStorage.getItem(DEMO_STORAGE_KEYS.quoteRequests)) writeKey(DEMO_STORAGE_KEYS.quoteRequests, []);
+  if (!localStorage.getItem(DEMO_STORAGE_KEYS.subscriptions)) writeKey(DEMO_STORAGE_KEYS.subscriptions, []);
+  if (!localStorage.getItem(DEMO_STORAGE_KEYS.taskers)) writeKey(DEMO_STORAGE_KEYS.taskers, []);
+  if (!localStorage.getItem(DEMO_STORAGE_KEYS.capabilities)) writeKey(DEMO_STORAGE_KEYS.capabilities, {});
+  if (!localStorage.getItem(DEMO_STORAGE_KEYS.aiMarketingHistory)) writeKey(DEMO_STORAGE_KEYS.aiMarketingHistory, []);
+  if (!localStorage.getItem(DEMO_STORAGE_KEYS.aiMarketingUsage)) writeKey(DEMO_STORAGE_KEYS.aiMarketingUsage, []);
+  if (!localStorage.getItem(DEMO_STORAGE_KEYS.brandVoiceProfiles)) writeKey(DEMO_STORAGE_KEYS.brandVoiceProfiles, {});
+  if (!localStorage.getItem(DEMO_STORAGE_KEYS.savedCampaigns)) writeKey(DEMO_STORAGE_KEYS.savedCampaigns, []);
+
+  if (getBookedVendors().length === 0) {
+    saveBookedVendors([
+      {
+        id: "EVV-1",
+        eventId: "evt-douala-afro",
+        vendorId: "list-dj-brice",
+        vendorName: "DJ Brice Mix",
+        category: "DJ",
+        logo: "https://images.unsplash.com/photo-1571266028243-d220c9c7f819?auto=format&fit=crop&q=80&w=900",
+        status: "confirmed",
+        publicVisible: true,
+      }
+    ]);
+  }
+  
+  if (getSponsors().length === 0) {
+    saveSponsors([
+      {
+        id: "SPO-1",
+        eventId: "evt-douala-afro",
+        sponsorName: "Pulse Entertainment",
+        sponsorLogo: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&q=80&w=200",
+        sponsorType: "brand",
+        packageName: "Gold Sponsor",
+        status: "approved",
+        showOnTicket: true,
+        showOnEventPage: true,
+      }
+    ]);
+  }
 
   syncLegacyKeys({ events, tickets, payments, memories, listings, posts, comments });
   return { users, events, listings, bookings, tickets, payments, memories, posts, comments, likes };
@@ -495,32 +549,23 @@ export function getEventById(id) {
 }
 
 export function saveEvents(events) {
-  writeKey(DEMO_STORAGE_KEYS.events, events);
-  writeKey("ig_events", events);
-  writeKey("invitegenie_events", events);
-  return events;
+  return writeEventsToStorage(events);
 }
 
 export function updateEvent(updatedEvent) {
-  const events = getEvents().map((item) => (String(item.id) === String(updatedEvent.id) ? updatedEvent : item));
-  saveEvents(events);
-  return updatedEvent;
+  return updateEventInStorage(updatedEvent.id, updatedEvent, [...MOCK_EVENTS, ...generateRoleOwnedEvents(getDemoUsers())]) || updatedEvent;
 }
 
 export function saveEvent(eventData) {
-  const nextEvent = {
-    id: `evt-${Date.now()}`,
+  return appendEventToStorage({
     status: "ACTIVE",
     currency: "FCFA",
     totalTickets: 100,
     ticketsSold: 0,
     availableTickets: 100,
-    qrCodeUrl: qrFor(`/events/evt-${Date.now()}`),
     createdAt: new Date().toISOString(),
     ...eventData,
-  };
-  saveEvents([nextEvent, ...getEvents()]);
-  return nextEvent;
+  }, [...MOCK_EVENTS, ...generateRoleOwnedEvents(getDemoUsers())]);
 }
 
 export function getMarketplaceProviders() {

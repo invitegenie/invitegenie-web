@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import * as Engine from "../auth/coreEngine";
+import { useAuth } from "../auth/AuthContext";
 
 import { canCreateMarketplaceListing } from "../services/roles";
 export default function ProfileDropdown({ isOpen, onClose, user }) {
   const navigate = useNavigate();
   const dropdownRef = useRef(null);
+  const { logout } = useAuth();
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -21,8 +22,8 @@ export default function ProfileDropdown({ isOpen, onClose, user }) {
 
   if (!isOpen) return null;
 
-  const handleLogout = () => {
-    Engine.logoutUser();
+  const handleLogout = async () => {
+    await logout();
     onClose();
     navigate("/login", { replace: true });
   };

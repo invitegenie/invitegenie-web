@@ -1,19 +1,20 @@
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import Icon from "../components/Icon";
 import { useAuth } from "../auth/AuthContext";
-import { getMarketplaceProviders } from "../services/mockData";
+import { getWallet } from "../services/walletService";
+import { getEscrowRecords } from "../services/escrowService";
+import MilestoneReleaseCard from "../components/MilestoneReleaseCard";
 import { getMarketplaceOrdersForSeller } from "../services/ticketingService";
 
 export default function VendorWallet() {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   
-  const myOrders = useMemo(() => getMarketplaceOrdersForSeller(currentUser?.id), [currentUser]);
-  const totalEarnings = useMemo(() => myOrders.reduce((sum, order) => sum + Number(order.amount || 0), 0), [myOrders]);
-  const pendingPayouts = totalEarnings * 0.15; // Mock pending amount
-  const withdrawable = totalEarnings - pendingPayouts;
+  const wallet = getWallet(currentUser?.id || "vendor-brice");
+  const escrows = getEscrowRecords().filter(e => e.vendorId === (currentUser?.id || "vendor-brice") && e.status !== "released");
+  const myOrders = getMarketplaceOrdersForSeller(currentUser?.id || "vendor-brice") || [];
 
   return (
     <Layout>
@@ -37,15 +38,15 @@ export default function VendorWallet() {
               <Icon name="account_balance_wallet" className="text-[24px]" />
             </div>
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Available Balance</p>
-            <p className="mt-2 text-3xl font-black text-white">FCFA {withdrawable.toLocaleString()}</p>
+            <p className="mt-2 text-3xl font-black text-white">FCFA {(wallet?.availableBalance || 0).toLocaleString()}</p>
           </div>
           
           <div className="rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-xl">
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400">
               <Icon name="pending" className="text-[24px]" />
             </div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Pending Clearance</p>
-            <p className="mt-2 text-3xl font-black text-white">FCFA {pendingPayouts.toLocaleString()}</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Held in Escrow</p>
+            <p className="mt-2 text-3xl font-black text-white">FCFA {(wallet?.escrowHeldBalance || 0).toLocaleString()}</p>
           </div>
           
           <div className="rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-xl">
@@ -53,7 +54,7 @@ export default function VendorWallet() {
               <Icon name="insights" className="text-[24px]" />
             </div>
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Total Lifetime Earnings</p>
-            <p className="mt-2 text-3xl font-black text-white">FCFA {totalEarnings.toLocaleString()}</p>
+            <p className="mt-2 text-3xl font-black text-white">FCFA {(wallet?.lifetimeEarnings || 0).toLocaleString()}</p>
           </div>
         </div>
 
@@ -76,9 +77,11 @@ export default function VendorWallet() {
                       <td className="py-4 pr-4 text-slate-400">{new Date(order.timestamp).toLocaleDateString()}</td>
                       <td className="py-4 pr-4 text-white">{order.listingTitle || "Service Booking"}</td>
                       <td className="py-4 pr-4">
-                        <span className="rounded-md bg-emerald-500/10 px-2 py-1 text-[10px] font-bold uppercase text-emerald-400">Completed</span>
+                        <span className={`rounded-md px-2 py-1 text-[10px] font-bold uppercase ${order.status === 'confirmed' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                          {order.status === 'confirmed' ? 'Completed' : order.status.replace('_', ' ')}
+                        </span>
                       </td>
-                      <td className="py-4 text-right font-bold text-emerald-400">+ FCFA {Number(order.amount).toLocaleString()}</td>
+                      <td className="py-4 text-right font-bold text-emerald-400">+ FCFA {Number(order.sellerPayout || order.amount).toLocaleString()}</td>
                     </tr>
                   )) : (
                     <tr>
@@ -91,20 +94,10 @@ export default function VendorWallet() {
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-[#111827] p-6 shadow-xl h-fit">
-            <h2 className="mb-6 text-lg font-bold text-white">Quick Stats</h2>
-            <div className="space-y-6">
-              <div>
-                <div className="flex justify-between text-sm"><span className="text-slate-400">Profile Views</span><span className="font-bold text-white">342</span></div>
-                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/5"><div className="h-full w-3/4 bg-violet-500"></div></div>
-              </div>
-              <div>
-                <div className="flex justify-between text-sm"><span className="text-slate-400">Quote Conversions</span><span className="font-bold text-white">68%</span></div>
-                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/5"><div className="h-full w-[68%] bg-emerald-500"></div></div>
-              </div>
-              <div>
-                <div className="flex justify-between text-sm"><span className="text-slate-400">Avg. Rating</span><span className="font-bold text-amber-400">4.9 â˜…</span></div>
-                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/5"><div className="h-full w-[98%] bg-amber-400"></div></div>
-              </div>
+            <h2 className="mb-6 text-lg font-bold text-white">Active Escrows</h2>
+            <div className="space-y-4">
+              {escrows.map(e => <MilestoneReleaseCard key={e.id} escrow={e} />)}
+              {escrows.length === 0 && <p className="text-slate-500 text-sm italic">No active escrows awaiting milestone release.</p>}
             </div>
           </div>
         </div>

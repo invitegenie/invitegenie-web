@@ -1,11 +1,13 @@
-﻿import { useState, useEffect, useCallback, useRef } from "react";
+﻿﻿import { useState, useEffect, useCallback, useRef } from "react";
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { supabase } from "../lib/supabaseClient";
 import { getUserProfile } from "../services/mockData";
-import { canCreateMarketplaceListing } from "../services/roles";
 import Icon from "../components/Icon";
+import FeatureBadge from "../components/FeatureBadge";
 import { useSearch } from "../contexts/SearchContext";
+import { getAccountType, getEffectiveCapabilities, getPlanLimits } from "../services/accountCapabilities";
 
 function SectionTitle({ children }) {
   return (
@@ -133,7 +135,10 @@ function DesktopSidebar() {
     <aside className="hidden min-w-0 rounded-3xl border border-white/[0.04] bg-[#141218]/80 p-4 shadow-md backdrop-blur-2xl lg:sticky lg:top-4 lg:flex lg:h-[calc(100vh-2rem)] lg:flex-col lg:overflow-y-auto">
       <div className="mb-6 flex items-center gap-3 px-2">
         <div className="h-9 w-9 rounded-full bg-gradient-to-tr from-violet-500 to-indigo-400 shadow-sm" />
-        <h2 className="text-xl font-semibold font-heading">InviteGenie</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-xl font-semibold font-heading">InviteGenie</h2>
+          <span className="rounded-md bg-violet-500/20 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest text-violet-300 border border-violet-500/30">Beta</span>
+        </div>
       </div>
 
       <nav className="space-y-2">
@@ -296,12 +301,14 @@ function DesktopHeader({ name, tier, showCreateListing }) {
       </div>
 
       <div className="flex shrink-0 items-center gap-4">
-        <button 
-          onClick={() => navigate("/marketplace/new")}
-          className="rounded-2xl border border-purple-500/40 bg-purple-500/10 px-5 py-3 text-sm font-bold text-purple-100 hover:bg-purple-500/20 transition-all"
-        >
-          Create Listing
-        </button>
+        {showCreateListing ? (
+          <button
+            onClick={() => navigate("/marketplace/new")}
+            className="rounded-2xl border border-purple-500/40 bg-purple-500/10 px-5 py-3 text-sm font-bold text-purple-100 hover:bg-purple-500/20 transition-all"
+          >
+            Create Listing
+          </button>
+        ) : null}
         <button 
           onClick={() => navigate("/events/new")}
           className="rounded-2xl bg-gradient-to-r from-purple-600 to-fuchsia-500 px-5 py-3 text-sm font-bold hover:opacity-90"
@@ -408,16 +415,50 @@ function UpgradeBanner() {
   );
 }
 
+function CapabilitySummary({ user }) {
+  const navigate = useNavigate();
+  const accountType = getAccountType(user || {});
+  const capabilities = getEffectiveCapabilities(user || {});
+  const limits = getPlanLimits(user || {});
+
+  return (
+    <section className="rounded-3xl border border-amber-300/15 bg-slate-950/70 p-5 shadow-xl backdrop-blur-xl">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-amber-300">Account System</p>
+          <h3 className="mt-2 text-xl font-black text-white">{accountType} account with capability modes</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-400">
+            Vendor, planner, tasker, and check-in access now live as toggles on one account.
+          </p>
+        </div>
+        <button onClick={() => navigate("/settings")} className="rounded-2xl border border-white/10 px-5 py-3 text-xs font-black uppercase tracking-widest text-slate-300 hover:bg-white/5">
+          Manage Modes
+        </button>
+      </div>
+      <div className="mt-5 flex flex-wrap gap-2">
+        <FeatureBadge label={capabilities.canSellServices ? "Vendor Mode" : "Vendor Off"} active={capabilities.canSellServices} tone="amber" />
+        <FeatureBadge label={capabilities.canHostEvents ? "Planner Tools" : "Planner Off"} active={capabilities.canHostEvents} />
+        <FeatureBadge label={capabilities.canBeTasker ? "Tasker Available" : "Tasker Off"} active={capabilities.canBeTasker} tone="emerald" />
+        <FeatureBadge label={capabilities.canRunCheckIn ? "Check-In Ready" : "Check-In Off"} active={capabilities.canRunCheckIn} />
+        <FeatureBadge label={limits.unlimitedEverything ? "Unlimited guests" : `${limits.maxGuestsPerEvent.toLocaleString()} guests/event`} tone="amber" />
+      </div>
+    </section>
+  );
+}
+
 function TaskPanelContent({ onTaskUpdated }) {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [pendingRemoval, setPendingRemoval] = useState({}); // { taskId: taskObject }
   const timeoutRefs = useRef({}); // { taskId: timeoutId }
 
   const fetchTasks = useCallback(async () => {
     if (!currentUser) return;
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
     try {
       const { data, error } = await supabase
         .from("tasks")
@@ -448,6 +489,7 @@ function TaskPanelContent({ onTaskUpdated }) {
 
   const handleToggleComplete = async (task) => {
     const taskId = task.id;
+    if (!supabase) return;
     try {
       const { error } = await supabase
         .from("tasks")
@@ -459,56 +501,7 @@ function TaskPanelContent({ onTaskUpdated }) {
       // Optimistically remove from UI
       setTasks(prev => prev.filter(t => t.id !== taskId));
 
-      // Add to pending removal with a timeout
-      const timeoutId = setTimeout(async () => {
-        try {
-          const { error: permanentUpdateError } = await supabase
-            .from("tasks")
-            .update({ completed: true })
-            .eq("id", taskId);
-
-          if (permanentUpdateError) throw permanentUpdateError;
-          if (onTaskUpdated) onTaskUpdated(); // Update parent badge count
-        } catch (err) {
-          console.error("Error permanently marking task complete:", err.message);
-          // If permanent update fails, revert UI change
-          setTasks(prev => [...prev, task].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
-        } finally {
-          setPendingRemoval(prev => {
-            const newPending = { ...prev };
-            delete newPending[taskId];
-            return newPending;
-          });
-          delete timeoutRefs.current[taskId];
-        }
-      }, 5000); // 5 seconds to undo
-
-      setPendingRemoval(prev => ({ ...prev, [taskId]: task })); // Store the task object itself
-      timeoutRefs.current[taskId] = timeoutId;
-    } catch (err) {
-      alert("Error updating task: " + err.message);
-    }
-  };
-
-  const handleUndoComplete = async (taskId) => {
-    clearTimeout(timeoutRefs.current[taskId]);
-    delete timeoutRefs.current[taskId];
-
-    setPendingRemoval(prev => {
-      const newPending = { ...prev };
-      delete newPending[taskId];
-      return newPending;
-    });
-
-    try {
-      const { error } = await supabase
-        .from("tasks")
-        .update({ completed: false })
-        .eq("id", taskId);
-
-      if (error) throw error;
-      if (onTaskUpdated) onTaskUpdated(); // Update parent badge count
-      fetchTasks(); // Re-fetch to get the task back in the list
+      if (onTaskUpdated) onTaskUpdated();
     } catch (err) {
       alert("Error updating task: " + err.message);
     }
@@ -528,7 +521,7 @@ function TaskPanelContent({ onTaskUpdated }) {
           tasks.map((task) => (
             <div key={task.id} className="group flex items-start gap-3">
               <button 
-                onClick={() => handleToggleComplete(task.id)}
+                onClick={() => handleToggleComplete(task)}
                 className="mt-1 h-4 w-4 rounded-full border border-slate-500 shrink-0 hover:bg-emerald-500/20 hover:border-emerald-500 transition-all flex items-center justify-center group/btn"
                 title="Mark as complete"
               >
@@ -642,7 +635,6 @@ function ScheduleMeetingModal({ isOpen, onClose, onSave }) {
 }
 
 function MeetingPanelContent({ onMeetingUpdated }) {
-  const navigate = useNavigate();
   const { currentUser } = useAuth();
   const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -650,6 +642,10 @@ function MeetingPanelContent({ onMeetingUpdated }) {
 
   const fetchMeetings = useCallback(async () => {
     if (!currentUser) return;
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
     try {
       const today = new Date().toISOString().split('T')[0];
       const { data, error } = await supabase
@@ -676,6 +672,7 @@ function MeetingPanelContent({ onMeetingUpdated }) {
 
   const handleDeleteMeeting = async (meetingId) => {
     if (!window.confirm("Are you sure you want to delete this meeting?")) return;
+    if (!supabase) return;
     
     try {
       const { error } = await supabase
@@ -693,6 +690,7 @@ function MeetingPanelContent({ onMeetingUpdated }) {
   };
 
   const handleSaveMeeting = async (formData) => {
+    if (!supabase) return;
     try {
       const { error } = await supabase
         .from("meetings")
@@ -924,9 +922,9 @@ function ToolsSection() {
   );
 }
 
-function AccountSection({ role, profile }) {
+function AccountSection({ role, showCreateListing }) {
   const navigate = useNavigate();
-  const isVendor = role === "vendor" || role === "tasker" || role === "event_planner";
+  const isVendor = showCreateListing || ["PRO", "BUSINESS", "ENTERPRISE"].includes(role);
 
   return (
     <section className="space-y-4">
@@ -998,7 +996,7 @@ export default function Profile() {
   const [meetingCount, setMeetingCount] = useState(0);
 
   const getTaskCount = async () => {
-    if (!currentUser) return;
+    if (!currentUser || !supabase) return;
     const { count, error } = await supabase
       .from("tasks")
       .select("*", { count: "exact", head: true })
@@ -1009,7 +1007,7 @@ export default function Profile() {
   };
 
   const getMeetingCount = async () => {
-    if (!currentUser) return;
+    if (!currentUser || !supabase) return;
     const today = new Date().toISOString().split('T')[0];
     const { count, error } = await supabase
       .from("meetings")
@@ -1061,6 +1059,7 @@ export default function Profile() {
             />
 
             <UpgradeBanner />
+            <CapabilitySummary user={currentUser || profile} />
 
             <div className="hidden space-y-6 lg:block">
               <section className="grid gap-6 lg:grid-cols-2 2xl:grid-cols-[1fr_1fr_0.9fr]">

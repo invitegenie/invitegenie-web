@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import Layout from "../components/Layout";
 import Icon from "../components/Icon";
 import { addProviderRequest, getProviderById } from "../services/mockData";
+import * as Engine from "../auth/coreEngine";
 
 export default function ProviderDetails() {
   const { providerId, vendorId } = useParams();
@@ -30,8 +31,8 @@ export default function ProviderDetails() {
     setQuoteOpen(false);
     showToast(`Request ${request.id} sent. Provider payout estimate: FCFA ${request.estimatedProviderPayout.toLocaleString()}.`);
 
-    const existingNotifs = Engine.getCollection(KEYS.NOTIFICATIONS) || [];
-    Engine.save(KEYS.NOTIFICATIONS, [
+    const existingNotifs = Engine.getCollection(Engine.KEYS.NOTIFICATIONS) || [];
+    Engine.save(Engine.KEYS.NOTIFICATIONS, [
       {
         id: `notif-quote-${Date.now()}`,
         userId: provider.ownerId || provider.userId,
@@ -62,8 +63,8 @@ export default function ProviderDetails() {
     });
     showToast(`Booking request ${request.id} created. Provider payout: FCFA ${request.estimatedProviderPayout.toLocaleString()}.`);
 
-    const existingNotifs = Engine.getCollection(KEYS.NOTIFICATIONS) || [];
-    Engine.save(KEYS.NOTIFICATIONS, [
+    const existingNotifs = Engine.getCollection(Engine.KEYS.NOTIFICATIONS) || [];
+    Engine.save(Engine.KEYS.NOTIFICATIONS, [
       {
         id: `notif-book-${Date.now()}`,
         userId: provider.ownerId || provider.userId,
