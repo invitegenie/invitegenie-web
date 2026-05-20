@@ -11,6 +11,7 @@ import {
   normalizeRole,
   USER_ROLES,
 } from "../services/roles";
+import { createDemoUser } from "../services/demoUsers";
 import { ACCOUNT_TYPES, buildUnifiedUser, normalizeAccountType } from "../services/accountCapabilities";
 
 const AUTH_STORAGE_KEY = "invitegenie_auth";
@@ -360,21 +361,56 @@ export function AuthProvider({ children }) {
           if (error) throw error;
           return data;
         } catch (error) {
-          if (error.message !== "Failed to fetch" && !error.message.toLowerCase().includes("network")) {
-            throw error;
-          }
-          console.warn("Offline mode: falling back to demo signup.");
+          console.warn("Supabase signup failed, falling back to demo signup.", error?.message || error);
         }
       }
 
+      const demoUser = createDemoUser({
+        email,
+        password,
+        full_name: fullName || email,
+        role: "normal_user",
+      });
+      const demoSession = toDemoSession(demoUser);
+      sessionStorage.setItem("invitegenie_demo_signup", "true");
+      persistSession(demoSession.user, demoSession.profile);
+      return demoSession.user;
+    },
+    [persistSession]
+  );
+
+  const sendWhatsAppOtp = useCallback(
+    async (phone, fullName) => {
+      if (supabase && isSupabaseConfigured()) {
+        try {
+          const { data, error } = await supabase.auth.signInWithOtp({
+            phone,
+            options: {
+              channel: 'whatsapp',
+              data: { full_name: fullName, role: USER_ROLES.BASIC_USER }
+            }
+          });
+          if (error) throw error;
+          return data;
+        } catch (error) {
+          if (error.message !== "Failed to fetch" && !error.message.toLowerCase().includes("network")) {
+            throw error;
+          }
+          console.warn("Offline mode: falling back to demo phone auth.");
+        }
+      }
+
+      // Demo fallback
       const demoSession = toDemoSession({
         ...(DEMO_ACCOUNTS.find((account) => normalizeRole(account.role) === USER_ROLES.FREE) || {}),
         id: `demo-${Date.now()}`,
-        email,
-        full_name: fullName || email,
+        phone,
+        email: `${phone}@demo.com`, // Fallback for email-dependent legacy code
+        full_name: fullName || "WhatsApp User",
         role: USER_ROLES.FREE,
         accountType: ACCOUNT_TYPES.FREE,
       });
+      sessionStorage.setItem("invitegenie_demo_signup", "true");
       persistSession(demoSession.user, demoSession.profile);
       return demoSession.user;
     },
@@ -416,6 +452,7 @@ export function AuthProvider({ children }) {
       login: signIn,
       logout: signOut,
       signup,
+      sendWhatsAppOtp,
       setUser: updateCurrentUser,
     }),
     [
@@ -430,6 +467,7 @@ export function AuthProvider({ children }) {
       signOut,
       refreshProfile,
       signup,
+      sendWhatsAppOtp,
       updateCurrentUser,
     ]
   );

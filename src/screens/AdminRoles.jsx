@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from "react";
+﻿﻿import { useMemo, useState } from "react";
 import {
   ADMIN_PERMISSION_OPTIONS,
   DEFAULT_ADMIN_ROLES,
@@ -139,8 +139,7 @@ export default function AdminRoles() {
           Admin Roles
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
-          Create, edit, delete, and assign admin roles. This uses local state for now and is shaped
-          for a future Supabase <span className="font-mono">admin_roles</span> table.
+        Create, edit, delete, and assign admin roles to manage permissions across the beta platform.
         </p>
       </header>
 

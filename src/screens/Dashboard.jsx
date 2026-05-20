@@ -1,4 +1,4 @@
-﻿﻿import { Link, useNavigate, useSearchParams } from "react-router-dom";
+﻿﻿﻿﻿import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMemo, useState } from "react";
 import Layout from "../components/Layout";
 import { useAuth } from "../auth/AuthContext";
@@ -94,7 +94,7 @@ export default function Dashboard() {
                 Welcome, {profile?.full_name || currentUser?.name || "InviteGenie User"}
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
-                Your dashboard tools are based on your active demo role and permissions. Data is localStorage-ready for Supabase later.
+              Your dashboard tools are based on your active beta profile and permissions. Experience the Genie AI and manage your events seamlessly.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3 sm:flex">
@@ -235,7 +235,7 @@ export default function Dashboard() {
           </div>
 
           <aside className="space-y-6">
-            <Panel title="Demo Accounts" subtitle="Quick ecosystem size">
+        <Panel title="Platform Activity" subtitle="Quick ecosystem size">
               <div className="grid grid-cols-2 gap-3">
                 <MiniStat label="Users" value={data?.users?.length || 0} />
                 <MiniStat label="Events" value={data?.events?.length || 0} />

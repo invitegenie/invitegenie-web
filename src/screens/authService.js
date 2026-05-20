@@ -1,10 +1,21 @@
-import { supabase } from "../lib/supabaseClient";
+﻿import { supabase } from "../lib/supabaseClient";
 
 export const validateEmail = (email) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!email || !email.trim()) return { valid: false, error: "Email is required." };
   if (!emailRegex.test(email.toLowerCase().trim())) return { valid: false, error: "Invalid email format." };
   return { valid: true, email: email.toLowerCase().trim() };
+};
+
+export const normalizePhone = (phone) => {
+  if (!phone) return "";
+  // Remove all non-digit characters except leading +
+  const cleaned = String(phone).trim().replace(/[^\d+]/g, "");
+  // Convert 00 prefix to +
+  if (cleaned.startsWith("00")) {
+    return `+${cleaned.slice(2)}`;
+  }
+  return cleaned;
 };
 
 export const signUpUser = async ({ email, password, name, whatsappOptIn, phone }) => {
@@ -48,5 +59,34 @@ export const resendVerification = async (email) => {
     const { error } = await supabase.auth.resend({ type: 'signup', email });
     if (error) throw error;
   }
+  return true;
+};
+
+export const verifyPhoneOTP = async (phone, token) => {
+  const normalizedPhone = normalizePhone(phone);
+  if (!normalizedPhone) throw new Error("Phone number is required.");
+
+  if (supabase) {
+    const { data, error } = await supabase.auth.verifyOtp({ phone: normalizedPhone, token, type: 'sms' });
+    if (error) throw error;
+    return data;
+  } else {
+    return { user: { phone_verified: true } };
+  }
+};
+
+export const resendPhoneVerification = async (phone) => {
+  const normalizedPhone = normalizePhone(phone);
+  if (!normalizedPhone) throw new Error("Phone number is required.");
+
+  if (supabase) {
+    const { data, error } = await supabase.auth.signInWithOtp({
+      phone: normalizedPhone,
+      options: { channel: 'whatsapp' },
+    });
+    if (error) throw error;
+    return data;
+  }
+
   return true;
 };

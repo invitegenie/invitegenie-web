@@ -312,6 +312,26 @@ export function saveDemoUsers(users) {
   return users;
 }
 
+export function createDemoUser({ email, password, full_name, phone = "", role = "normal_user", city = "Cameroon" }) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const users = getDemoUsers();
+  const existing = users.find((user) => String(user.email).trim().toLowerCase() === normalizedEmail);
+  const demoUser = existing
+    ? { ...existing, password, full_name, phone: phone || existing.phone || "" }
+    : buildUser({
+        id: `demo-${Date.now()}`,
+        full_name: full_name || normalizedEmail,
+        email: normalizedEmail,
+        password,
+        phone,
+        role,
+        city,
+      });
+  const nextUsers = existing ? users.map((user) => (user.email.toLowerCase() === normalizedEmail ? demoUser : user)) : [demoUser, ...users];
+  saveDemoUsers(nextUsers);
+  return demoUser;
+}
+
 export function findDemoUser(email, password) {
   return getDemoUsers().find(
     (user) =>

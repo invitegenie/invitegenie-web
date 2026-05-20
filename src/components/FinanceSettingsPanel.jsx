@@ -15,7 +15,7 @@ export default function FinanceSettingsPanel() {
   const handleSave = () => {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
-    alert('Finance settings saved (demo only).');
+    alert('Finance settings saved.');
   };
 
   return (

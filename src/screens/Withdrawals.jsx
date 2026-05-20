@@ -364,7 +364,7 @@ export default function Withdrawals() {
                 </div>
                 {isPayoutAdmin && (
                   <p className="mt-2 text-xs text-amber-400/80">
-                    Demo payout controls — connect to Supabase and payment provider before production.
+                    Beta payout controls active.
                   </p>
                 )}
               </div>

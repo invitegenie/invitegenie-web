@@ -1,39 +1,63 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-
-const PLAN_DEMO_LOGINS = [
-  {
-    label: "FREE",
-    email: "marie.user@invitegenie.cm",
-    note: "Basic events, storefront, tasker, and check-in modes",
-  },
-  {
-    label: "PRO",
-    email: "estelle.pro@invitegenie.cm",
-    note: "AI tools, higher limits, priority visibility",
-  },
-  {
-    label: "BUSINESS",
-    email: "brice.vendor@invitegenie.cm",
-    note: "Unlimited services, teams, advanced marketplace tools",
-  },
-  {
-    label: "ENTERPRISE",
-    email: "mtn.enterprise@invitegenie.cm",
-    note: "Unlimited scale and enterprise workflows",
-  },
-];
+import { normalizePhone } from "./authService";
 
 export default function Login() {
   const [isSignUp, setIsSignUp] = useState(false);
-  // TEMPORARY: Prefilled for development
-  const [formData, setFormData] = useState({ name: "", email: "", password: "" });
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [authMethod, setAuthMethod] = useState("email"); // "email" or "whatsapp"
+  const [formData, setFormData] = useState({ name: "", email: "", password: "", phone: "", whatsappOptIn: false });
   const [isProcessing, setIsProcessing] = useState(false);
-  const { login, signup } = useAuth();
+  const [resetSent, setResetSent] = useState(false);
+  const { login, signup, sendWhatsAppOtp } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
+  // To handle the supabase directly for reset password
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    if (!formData.email) return alert("Please enter your email address to reset your password");
+    setIsProcessing(true);
+    try {
+      const { supabase } = await import("../lib/supabaseClient");
+      if (supabase) {
+        const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
+          redirectTo: window.location.origin + '/login',
+        });
+        if (error) throw error;
+        setResetSent(true);
+      } else {
+        alert("Password reset is not available in demo mode.");
+      }
+    } catch (error) {
+      alert(error.message || "Failed to send reset link.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleWhatsAppSubmit = async (e) => {
+    e.preventDefault();
+
+    const cleanPhone = normalizePhone(formData.phone);
+    if (!cleanPhone || (isSignUp && !formData.name)) {
+      return alert("Please enter a valid phone number with country code and fill in all required fields.");
+    }
+
+    setIsProcessing(true);
+    try {
+      await sendWhatsAppOtp(cleanPhone, formData.name || "User");
+      sessionStorage.setItem("invitegenie_whatsapp_phone", cleanPhone);
+      sessionStorage.setItem("invitegenie_whatsapp_fullName", formData.name || "User");
+      navigate("/verify-phone", { state: { phone: cleanPhone, fullName: formData.name }, replace: true });
+    } catch (error) {
+      alert(error.message || "Failed to send WhatsApp verification code. Please try again.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleEmailSubmit = async (e) => {
     e.preventDefault();
     
     const cleanEmail = formData.email.trim().toLowerCase();
@@ -54,6 +78,8 @@ export default function Login() {
       setIsProcessing(false);
     }
   };
+
+  const handleSubmit = authMethod === "whatsapp" ? handleWhatsAppSubmit : handleEmailSubmit;
 
   return (
     <div className="min-h-screen bg-[#0f1014] flex flex-col lg:flex-row selection:bg-violet-500/30">
@@ -110,80 +136,153 @@ export default function Login() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="bg-white/[0.03] backdrop-blur-2xl border border-white/10 p-8 rounded-[2rem] shadow-2xl space-y-5">
-            {isSignUp && (
+          {!isForgotPassword && !isSignUp && (
+            <div className="flex gap-2 bg-white/5 border border-white/10 rounded-xl p-1">
+              <button
+                type="button"
+                onClick={() => setAuthMethod("email")}
+                className={`flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
+                  authMethod === "email"
+                    ? "bg-violet-600 text-white shadow-lg shadow-violet-900/40"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <span className="material-symbols-outlined text-lg align-middle">mail</span> Email
+              </button>
+              <button
+                type="button"
+                onClick={() => setAuthMethod("whatsapp")}
+                className={`flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
+                  authMethod === "whatsapp"
+                    ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/40"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <span className="material-symbols-outlined text-lg align-middle">chat</span> WhatsApp
+              </button>
+            </div>
+          )}
+
+          <form onSubmit={isForgotPassword ? handleResetPassword : handleSubmit} className="bg-white/[0.03] backdrop-blur-2xl border border-white/10 p-8 rounded-[2rem] shadow-2xl space-y-5">
+            {!isForgotPassword && isSignUp && (
               <div className="space-y-1.5 animate-in fade-in zoom-in-95 duration-300">
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Full Name</label>
                 <input
                   type="text"
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-3.5 text-sm text-white outline-none focus:ring-2 focus:ring-violet-500/50 transition-all"
-                  placeholder="Ngalle Marie"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Your Full Name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
+              </div>
+          )}
+
+            {(authMethod === "email" || isForgotPassword) && (
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Email Address</label>
+                <input
+                  type="email"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-3.5 text-sm text-white outline-none focus:ring-2 focus:ring-violet-500/50 transition-all"
+                  placeholder="user@invitegenie.com"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  autoCapitalize="none"
+                  autoCorrect="off"
                 />
               </div>
             )}
 
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Email Address</label>
-              <input
-                type="email"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-3.5 text-sm text-white outline-none focus:ring-2 focus:ring-violet-500/50 transition-all"
-                placeholder="user@invitegenie.com"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                autoCapitalize="none"
-                autoCorrect="off"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Password</label>
-              <input
-                type="password"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-3.5 text-sm text-white outline-none focus:ring-2 focus:ring-violet-500/50 transition-all"
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={isProcessing}
-              className="w-full py-3.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-violet-900/40 hover:scale-[1.02] active:scale-95 transition-all"
-            >
-              {isProcessing ? "Authenticating..." : (isSignUp ? "Create Account" : "Sign In")}
-            </button>
-          </form>
-
-          {!isSignUp && (
-            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
-              <p className="mb-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Plan demos</p>
-              <p className="mb-3 text-xs leading-5 text-slate-500">Use one of the four account plans. Capabilities are toggled after login in Settings.</p>
-              <div className="grid gap-2">
-                {PLAN_DEMO_LOGINS.map(({ label, email, note }) => (
-                  <button
-                    key={email}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, email, password: "demo123" })}
-                    className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-left transition hover:border-violet-400/40 hover:bg-violet-500/10"
-                  >
-                    <span className="block text-[10px] font-black uppercase tracking-[0.18em] text-white">{label}</span>
-                    <span className="mt-1 block text-xs leading-5 text-slate-500">{note}</span>
-                  </button>
-                ))}
+            {authMethod === "whatsapp" && (
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Phone Number</label>
+                <input
+                  type="tel"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-3.5 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
+                  placeholder="+237 6XX XXX XXX"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                />
+                <p className="text-[10px] text-slate-500 mt-2">We'll send a verification code via WhatsApp</p>
               </div>
+            )}
+
+          {isSignUp && authMethod === "email" && (
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Phone Number (Optional)</label>
+              <input
+                type="tel"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-3.5 text-sm text-white outline-none focus:ring-2 focus:ring-violet-500/50 transition-all"
+                placeholder="+237 6XX XXX XXX"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              />
             </div>
           )}
 
+            {authMethod === "email" && !isForgotPassword && (
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center px-1">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Password</label>
+                  {!isSignUp && (
+                    <button type="button" onClick={() => { setIsForgotPassword(true); setAuthMethod("email"); }} className="text-[10px] font-bold text-violet-400 hover:text-violet-300 transition-colors uppercase tracking-widest">
+                      Forgot Password?
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="password"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-3.5 text-sm text-white outline-none focus:ring-2 focus:ring-violet-500/50 transition-all"
+                  placeholder="••••••••"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                />
+              </div>
+            )}
+
+          {!isForgotPassword && isSignUp && (
+            <label className="flex items-start gap-3 mt-4 mb-2 cursor-pointer">
+              <input type="checkbox" checked={formData.whatsappOptIn} onChange={(e) => setFormData({ ...formData, whatsappOptIn: e.target.checked })} className="mt-1 accent-emerald-500" />
+              <span className="text-xs text-slate-400">Send me important booking and payment alerts on WhatsApp.</span>
+            </label>
+          )}
+
+            {resetSent ? (
+              <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-center">
+                <p className="text-emerald-400 text-xs font-bold">Password reset link sent to your email!</p>
+              </div>
+            ) : (
+              <button
+                type="submit"
+                disabled={isProcessing}
+                className={`w-full py-3.5 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:scale-[1.02] active:scale-95 transition-all ${
+                  authMethod === "whatsapp"
+                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 shadow-emerald-900/40 disabled:opacity-50"
+                    : "bg-gradient-to-r from-violet-600 to-indigo-600 shadow-violet-900/40 disabled:opacity-50"
+                }`}
+              >
+                {isProcessing ? "Processing..." : (isForgotPassword ? "Send Reset Link" : (authMethod === "whatsapp" ? "Send WhatsApp Code" : (isSignUp ? "Create Account" : "Sign In")))}
+              </button>
+            )}
+          </form>
+
+        {!isForgotPassword && isSignUp && authMethod === "email" && <p className="mt-4 text-[10px] text-slate-500 text-center uppercase tracking-widest">We'll send a verification code or link to confirm your email.</p>}
+
           <div className="text-center">
-            <button
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="text-[10px] font-bold text-slate-500 hover:text-violet-400 transition-colors uppercase tracking-widest"
-            >
-              {isSignUp ? "Existing user? Sign In" : "New user? Create account"}
-            </button>
+            {isForgotPassword ? (
+              <button
+                onClick={() => { setIsForgotPassword(false); setResetSent(false); }}
+                className="text-[10px] font-bold text-slate-500 hover:text-violet-400 transition-colors uppercase tracking-widest"
+              >
+                Back to Sign In
+              </button>
+            ) : (
+              <button
+                onClick={() => { setIsSignUp(!isSignUp); setAuthMethod("email"); }}
+                className="text-[10px] font-bold text-slate-500 hover:text-violet-400 transition-colors uppercase tracking-widest"
+              >
+                {isSignUp ? "Existing user? Sign In" : "New user? Create account"}
+              </button>
+            )}
           </div>
         </div>
       </div>

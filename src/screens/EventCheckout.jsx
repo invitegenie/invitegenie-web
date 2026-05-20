@@ -7,6 +7,7 @@ import { getEventById } from "../services/mockData";
 import PaymentMethodSelector from "../components/PaymentMethodSelector";
 import { PAYMENT_PROVIDERS } from "../services/paymentProviderConfig";
 import { initiatePayment } from "../services/paymentGatewayService";
+import { openWhatsAppBooking } from "../services/whatsappMessageFormatter";
 
 const VIP_TABLES = [
   { id: "T1", label: "Table 1 (Front Row)", price: 150000, capacity: 4, available: true },
@@ -29,7 +30,7 @@ export default function EventCheckout() {
   const event = getEventById(eventId);
 
   useEffect(() => {
-    const pending = localStorage.getItem("demo_pending_checkout");
+    const pending = localStorage.getItem("beta_pending_checkout") || localStorage.getItem("demo_pending_checkout");
     if (pending) {
       const data = JSON.parse(pending);
       if (String(data.eventId) === String(eventId)) {
@@ -69,11 +70,31 @@ export default function EventCheckout() {
         initialPaymentStatus: isFree ? "paid" : "unpaid",
       });
 
+      localStorage.removeItem("beta_pending_checkout");
       localStorage.removeItem("demo_pending_checkout");
 
       if (isFree) {
         navigate("/my-tickets");
         return;
+      }
+
+      if (selectedProvider?.id === "manual_demo" || selectedProvider?.name?.includes("Manual")) {
+        openWhatsAppBooking(
+          { id: event.hostId || event.vendorId },
+          {
+            vendorName: event.hostName || event.vendorName || "Host",
+            bookingId: result.booking.id,
+            serviceName: `Ticket: ${event.title}`,
+            price: `${totalAmount} FCFA`,
+            date: event.date,
+            clientName: payload.buyerName || currentUser?.name || "Guest",
+            clientPhone: payload.buyerPhone || currentUser?.phone || "N/A",
+            clientEmail: payload.buyerEmail || currentUser?.email || "N/A",
+            paymentMethod: selectedProvider?.name,
+            amount: totalAmount,
+            notes: selectedTable ? `Selected Table: ${selectedTable.label}` : ""
+          }
+        );
       }
 
       const payment = initiatePayment({

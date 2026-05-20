@@ -1,4 +1,4 @@
-﻿﻿import { useMemo, useState } from "react";
+﻿﻿﻿﻿import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Layout from "../components/Layout";
 import SmartVendorRecommendations from "../components/SmartVendorRecommendations";
@@ -101,7 +101,8 @@ export default function EventDetails() {
       buyerPhone: buyer.phone,
       amount: total,
     };
-    localStorage.setItem("demo_pending_checkout", JSON.stringify(payload));
+    localStorage.setItem("beta_pending_checkout", JSON.stringify(payload));
+    localStorage.setItem("demo_pending_checkout", JSON.stringify(payload)); // Backwards compat
     navigate(`/events/${event.id}/checkout`);
   };
 

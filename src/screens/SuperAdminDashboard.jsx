@@ -42,9 +42,9 @@ export default function SuperAdminDashboard() {
   ];
 
   const handleRestoreData = async () => {
-    if (window.confirm("Are you sure you want to completely wipe and restore all demo data? This cannot be undone.")) {
+    if (window.confirm("Are you sure you want to restore the seeded Beta marketplace data? This cannot be undone.")) {
       await seedDemoData();
-      alert("Demo data fully restored! The page will now refresh.");
+      alert("Beta data fully restored! The page will now refresh.");
       window.location.reload();
     }
   };
@@ -99,7 +99,7 @@ export default function SuperAdminDashboard() {
               className="inline-flex w-fit items-center gap-2 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-5 py-3 text-xs font-black uppercase tracking-[0.18em] text-rose-400 transition hover:bg-rose-500 hover:text-white"
             >
               <span className="material-symbols-outlined text-base">restore</span>
-              Restore Demo Data
+              Restore Seeded Data
             </button>
             <Link
               to="/admin/roles"

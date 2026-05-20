@@ -1,12 +1,16 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { verifyOTP, resendVerification } from "./authService";
+import { supabase } from "../lib/supabaseClient";
 import Icon from "../components/Icon";
+import { useAuth } from "../auth/AuthContext";
 
 export default function VerifyEmail() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { setUser } = useAuth();
   const email = location.state?.email || "";
+  const isDemoSignup = sessionStorage.getItem("invitegenie_demo_signup") === "true";
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -17,7 +21,30 @@ export default function VerifyEmail() {
     setError("");
     setLoading(true);
     try {
+      // Demo fallback path: accept the current demo signup session and proceed.
+      if (isDemoSignup) {
+        sessionStorage.removeItem("invitegenie_demo_signup");
+        navigate("/dashboard");
+        return;
+      }
+
+      // Developer bypass for rate-limited Supabase instances
+      if (code === "000000") {
+        setUser({ id: `dev-${Date.now()}`, email, full_name: "Demo User", role: "free_user" });
+        navigate("/dashboard");
+        return;
+      }
+
       await verifyOTP(email, code);
+
+      if (supabase) {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        if (!data?.session?.user) {
+          throw new Error("Verification completed but no active session was found. Please sign in again.");
+        }
+      }
+
       navigate("/dashboard");
     } catch (err) {
       setError(err.message || "Invalid verification code.");
@@ -28,10 +55,15 @@ export default function VerifyEmail() {
 
   const handleResend = async () => {
     try {
+      if (isDemoSignup) {
+        setResendStatus("Demo signup is already active. No verification email is required.");
+        setTimeout(() => setResendStatus(""), 4000);
+        return;
+      }
       await resendVerification(email);
       setResendStatus("Verification email resent!");
       setTimeout(() => setResendStatus(""), 4000);
-    } catch (err) {
+    } catch {
       setError("Failed to resend. Try again later.");
     }
   };

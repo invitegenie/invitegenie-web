@@ -140,7 +140,7 @@ export default function Tasks() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-xl font-black text-white">Available Taskers</h2>
-              <p className="mt-1 text-sm text-slate-500">Demo staffing profiles stored in localStorage.</p>
+              <p className="mt-1 text-sm text-slate-500">Beta staffing profiles stored securely.</p>
             </div>
             <button onClick={() => navigate("/settings")} className="rounded-2xl border border-white/10 px-5 py-3 text-xs font-black uppercase tracking-widest text-slate-300 hover:bg-white/5">
               Manage Modes

@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+﻿﻿import { useState } from "react";
 import Layout from "../components/Layout";
 import PageTitle from "../components/PageTitle";
 import FeatureBadge from "../components/FeatureBadge";
@@ -107,9 +107,9 @@ export default function Settings() {
         />
 
         <section className="rounded-3xl border border-white/10 bg-slate-900/60 p-6 shadow-xl backdrop-blur-xl">
-          <h3 className="text-xl font-bold text-white mb-2">Switch Plan Demo</h3>
+          <h3 className="text-xl font-bold text-white mb-2">Preview Account Plans</h3>
           <p className="mb-5 text-sm text-slate-400">
-            Test the four SaaS account plans. Vendor, planner, tasker, and check-in access are controlled by the capability toggles below.
+            Preview the different subscription tiers. Vendor, planner, tasker, and check-in access are controlled by the capability toggles below.
           </p>
           <select
             value={currentUser?.id || ""}

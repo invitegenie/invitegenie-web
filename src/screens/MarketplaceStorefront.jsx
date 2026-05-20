@@ -26,6 +26,7 @@ import PublicStorefrontLayout from "../components/PublicStorefrontLayout";
 import StorefrontHero from "../components/StorefrontHero";
 import StorefrontServiceGrid from "../components/StorefrontServiceGrid";
 import { trackBookingClick } from "../services/storefrontAnalyticsService";
+import { openWhatsAppBooking } from "../services/whatsappMessageFormatter";
 import * as Engine from "../auth/coreEngine";
 
 const tabs = ["All", "Packages", "Services", "Products", "Featured", "Custom"];
@@ -129,12 +130,12 @@ export default function MarketplaceStorefront() {
   };
 
   const contactProvider = () => {
-    const digits = String(settings.contactPhone || "").replace(/\D/g, "");
-    if (!digits) {
-      showToast("Contact details will be confirmed after booking.");
-      return;
-    }
-    window.open(`https://wa.me/${digits}?text=${encodeURIComponent(settings.whatsappText)}`, "_blank", "noopener,noreferrer");
+    openWhatsAppBooking(provider, {
+      vendorName: settings.businessName || provider.businessName || provider.name,
+      clientName: profile?.full_name || currentUser?.name || "Client",
+      serviceName: "Demande via Storefront",
+      notes: "J'aimerais avoir plus d'informations sur vos services.",
+    });
   };
 
   const bookProduct = (product) => {
@@ -256,7 +257,7 @@ export default function MarketplaceStorefront() {
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.24em] text-amber-300">Vendor Tools</p>
                 <h2 className="mt-2 text-2xl font-black text-white">Add Product / Service</h2>
-                <p className="mt-1 max-w-2xl text-sm text-stone-400">Upload a photo, let the local demo AI suggest listing details, then publish instantly to this storefront.</p>
+                <p className="mt-1 max-w-2xl text-sm text-stone-400">Upload a photo, let the Genie suggest listing details, then publish instantly to this storefront.</p>
               </div>
               <div className="flex flex-wrap gap-3">
                 <button onClick={() => navigate(`/ai-marketing-studio?provider=${activeProviderId}`)} className="rounded-full border border-amber-300/30 bg-amber-300/10 px-6 py-4 text-xs font-black uppercase tracking-widest text-amber-100 hover:bg-amber-300/20">
@@ -354,7 +355,7 @@ export function StorefrontModeration() {
           <p className="text-xs font-black uppercase tracking-[0.26em] text-[#FBBF24]">Marketplace Storefronts</p>
           <h1 className="mt-3 text-3xl font-black tracking-tight text-white sm:text-4xl">Storefront Moderation</h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
-            Approve pending products, hide inappropriate listings, and manage featured storefronts in local demo mode.
+            Approve pending products, hide inappropriate listings, and manage featured storefronts in beta.
           </p>
         </div>
         <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="rounded-2xl border border-white/10 bg-[#0D1320] px-4 py-3 text-sm font-bold text-white outline-none">
@@ -520,7 +521,7 @@ function ListingDrawer({ provider, settings, onClose, onSaved }) {
   const generateSuggestion = () => {
     const suggestion = generateProductSuggestionFromPhoto(image || sampleUpload, settings.category);
     setForm((prev) => ({ ...prev, ...suggestion, image: image || sampleUpload }));
-    setStatus("Mock AI suggestions are ready. Edit anything before publishing.");
+    setStatus("Genie suggestions are ready. Edit anything before publishing.");
   };
 
   const save = (nextStatus) => {

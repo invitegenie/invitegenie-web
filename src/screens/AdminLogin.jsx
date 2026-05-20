@@ -1,4 +1,4 @@
-﻿﻿import React, { useState } from "react";
+﻿﻿﻿﻿import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import Icon from "../components/Icon";
@@ -6,8 +6,7 @@ import { USER_ROLES } from "../services/roles";
 
 export default function AdminLogin() {
   const { login } = useAuth();
-  // TEMPORARY: Auto-filled for development access
-  const [formData, setFormData] = useState({ email: "super@invitegenie.cm", password: "demo123" });
+  const [formData, setFormData] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
@@ -89,31 +88,6 @@ export default function AdminLogin() {
       <div className="hidden lg:flex w-[40%] bg-[#0B0F19] border-r border-white/5 p-12 flex-col justify-center relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-[#8B5CF6]/5 to-amber-500/5" />
         <div className="relative z-10 space-y-8">
-          <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-6 text-[10px] mb-10">
-            <p className="text-amber-400 font-black uppercase tracking-widest mb-3 flex items-center gap-2">
-              <Icon name="terminal" className="text-sm" /> Developer Quick Access
-            </p>
-            <div className="flex gap-2">
-              <button 
-                onClick={() => setFormData({ email: "admin1@invitegenie.cm", password: "demo123" })}
-                className="px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-white transition-all"
-              >
-                Fill Admin
-              </button>
-              <button 
-                onClick={() => setFormData({ email: "super@invitegenie.cm", password: "demo123" })}
-                className="px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-white transition-all"
-              >
-                Fill Super Admin
-              </button>
-              <button 
-                onClick={() => setFormData({ email: "finance1@invitegenie.cm", password: "demo123" })}
-                className="px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-white transition-all"
-              >
-                Fill Finance
-              </button>
-            </div>
-          </div>
 
           <div className="space-y-4">
             <h2 className="text-5xl font-black text-white leading-tight tracking-tighter uppercase">Governance<br/>Console.</h2>

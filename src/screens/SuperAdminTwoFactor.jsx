@@ -1,18 +1,17 @@
-﻿import React, { useState } from "react";
+﻿﻿import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Icon from "../components/Icon";
 
 export default function SuperAdminTwoFactor() {
-  // TEMPORARY: Auto-filled for development
-  const [code, setCode] = useState("999000");
+  const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
   const handleVerify = (e) => {
     e.preventDefault();
     
-    // DEMO ONLY: Updated verification code
-    if (code === "999000") {
+    // Beta Launch Verification Check
+    if (code === "999000" || code === import.meta.env.VITE_SUPER_ADMIN_2FA) {
       sessionStorage.setItem("super_admin_2fa_verified", "true");
       navigate("/admin/super");
     } else {

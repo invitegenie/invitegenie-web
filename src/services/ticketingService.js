@@ -114,6 +114,17 @@ export function updateMarketplaceOrderStatus(orderId, status) {
   return orders[index];
 }
 
+export function updatePaymentStatus(paymentId, status) {
+  ensureDemoData();
+  const payments = readKey(DEMO_STORAGE_KEYS.payments, []);
+  const index = payments.findIndex(p => String(p.id) === String(paymentId));
+  if (index === -1) return null;
+
+  payments[index] = { ...payments[index], status };
+  writeKey(DEMO_STORAGE_KEYS.payments, payments);
+  return payments[index];
+}
+
 export function createTicketPurchase({
   user,
   eventId,

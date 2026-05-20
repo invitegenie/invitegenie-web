@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect } from "react";
+﻿﻿import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import { getGenieResponse } from "../services/aiAssistantService";
@@ -26,7 +26,7 @@ export default function Genie() {
   const [messages, setMessages] = useState([
     {
       id: 1,
-      text: "Hello! I'm the Genie of Invite Genie! ðŸ§ž I can help you:\nâ€¢ Create event descriptions and ideas\nâ€¢ Write invitation text\nâ€¢ Suggest themes and layouts\nâ€¢ Improve your event details\n\nWhat would you like help with today?",
+      text: "Hello! I'm the Genie of InviteGenie! 🧞‍♂️ I can help you:\n• Create event descriptions and ideas\n• Write invitation text\n• Suggest themes and layouts\n• Improve your event details\n\nWhat would you like help with today?",
       sender: "genie",
       timestamp: new Date(),
     },

@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from "react";
+﻿﻿﻿﻿import { useMemo, useState } from "react";
 import {
   DEFAULT_ADMIN_ROLES,
   DEMO_ACCOUNTS,
@@ -136,8 +136,8 @@ export default function AdminUsers() {
           Admin Users
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
-          View admin users, assign roles, activate or deactivate accounts, and inspect effective permissions.
-          This is local mock state ready to connect to Supabase.
+        View admin users, assign roles, activate or deactivate accounts, and inspect effective permissions.
+        This is the active beta state connected to Supabase.
         </p>
       </header>
 

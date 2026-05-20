@@ -10,6 +10,7 @@ import { NORMAL_USER_ROLES, USER_ROLES } from "./services/roles";
 import Dashboard from "./screens/Dashboard";
 import Login from "./screens/Login";
 import VerifyEmail from "./screens/VerifyEmail";
+import VerifyPhone from "./screens/VerifyPhone";
 import AdminLogin from "./screens/AdminLogin";
 import SuperAdminTwoFactor from "./screens/SuperAdminTwoFactor";
 import SuperAdminDashboard from "./screens/SuperAdminDashboard";
@@ -123,6 +124,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Login />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/verify-phone" element={<VerifyPhone />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/shared/event/:eventId" element={<SharedMemoryPreview />} />
           <Route path="/shared/event/:eventId/website" element={<EventWebsite />} />

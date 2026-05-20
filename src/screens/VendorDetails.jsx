@@ -1,12 +1,14 @@
-﻿﻿﻿﻿import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import Icon from "../components/Icon";
 import * as Engine from "../auth/coreEngine";
 import { KEYS } from "../auth/coreEngine";
+import { useAuth } from "../auth/AuthContext";
 import useEngineCollection from "./useEngineCollection";
 import { sendMessage } from "../services/messagingService";
 import { getProviderById } from "../services/mockData";
+import { openWhatsAppBooking } from "../services/whatsappMessageFormatter";
 
 const BookingModal = ({ isOpen, onClose, vendor, onSubmit }) => {
   const [formData, setFormData] = useState({ date: '', requirements: '' });
@@ -67,6 +69,7 @@ const BookingModal = ({ isOpen, onClose, vendor, onSubmit }) => {
 export default function VendorDetails() {
   const { vendorId } = useParams();
   const navigate = useNavigate();
+  const { currentUser, profile } = useAuth();
   const allVendors = useEngineCollection(KEYS.VENDORS) || [];
   const [activeTab, setActiveTab] = useState("portfolio");
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
@@ -79,8 +82,14 @@ export default function VendorDetails() {
   }, [allVendors, vendorId]);
 
   const handleInquirySubmit = (data) => {
-    // For now, mock the submission. Later this will sync to Supabase.
-    alert(`Inquiry sent to ${vendor.name} for ${data.date}. The Genie will notify you once they respond!`);
+    openWhatsAppBooking(vendor, {
+      vendorName: vendor.businessName || vendor.name,
+      clientName: profile?.full_name || currentUser?.name || "Client",
+      serviceName: "Inquiry via Profile",
+      date: data.date,
+      notes: data.requirements,
+      paymentMethod: "N/A",
+    });
     setIsBookingModalOpen(false);
 
     const existingNotifs = Engine.getCollection(KEYS.NOTIFICATIONS) || [];

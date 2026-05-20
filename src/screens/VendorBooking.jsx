@@ -8,6 +8,7 @@ import { getStorefrontProductById, STOREFRONT_STORAGE_KEYS } from "../services/m
 import { checkBookingConflict } from "../services/bookingConflictService";
 import * as Engine from "../auth/coreEngine";
 import { sendMessage } from "../services/messagingService";
+import { openWhatsAppBooking } from "../services/whatsappMessageFormatter";
 
 function makePendingOrderId() {
   return `ORD-${Date.now()}`;
@@ -213,6 +214,23 @@ export default function VendorBooking() {
     navigate("/checkout");
   };
 
+  const handleWhatsAppContact = () => {
+    openWhatsAppBooking(provider, {
+      vendorName: provider.businessName || provider.name,
+      bookingId: "EN_ATTENTE",
+      serviceName: bookingItem?.title || "Demande de service",
+      price: bookingItem?.price ? `${Number(bookingItem.price).toLocaleString()} FCFA` : "Devis",
+      date: date && time ? `${date} à ${time}` : "À confirmer",
+      clientName: profile?.full_name || currentUser?.name || "Client",
+      clientPhone: profile?.phone || currentUser?.phone || "",
+      clientEmail: currentUser?.email || "",
+      clientLocation: profile?.city || "Cameroon",
+      paymentMethod: "Contact Direct",
+      amount: total || 0,
+      notes: buyerNotes || "Je suis intéressé par vos services sur InviteGenie."
+    });
+  };
+
   return (
     <Layout showHeader={false}>
       <div className="mx-auto max-w-6xl space-y-6 pb-28">
@@ -361,10 +379,10 @@ export default function VendorBooking() {
               Proceed to Payment
             </button>
             <button
-              onClick={() => setIsMessageModalOpen(true)}
-              className="mt-3 w-full rounded-xl border border-white/10 bg-white/[0.04] px-5 py-4 text-xs font-black uppercase tracking-widest text-white shadow-xl transition hover:bg-white/[0.08]"
+              onClick={handleWhatsAppContact}
+              className="mt-3 w-full rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-4 text-xs font-black uppercase tracking-widest text-emerald-400 shadow-xl transition hover:bg-emerald-500/20 flex items-center justify-center gap-2"
             >
-              Message Provider
+              <Icon name="chat" className="text-sm" /> Contact via WhatsApp
             </button>
           </aside>
         </div>
