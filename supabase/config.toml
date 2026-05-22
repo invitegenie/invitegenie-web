@@ -4,7 +4,7 @@ project_id = "invitegenie-web"
 enabled = true
 
 [db]
-major_version = 15
+major_version = 17
 
 [functions.send-notification]
 verify_jwt = true

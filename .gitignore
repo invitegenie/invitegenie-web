@@ -3,6 +3,7 @@
 
 # Build output
 /dist
+supabase/.temp/
 
 # Environment variables
 .env
