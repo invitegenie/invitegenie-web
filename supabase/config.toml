@@ -1,0 +1,10 @@
+project_id = "invitegenie-web"
+
+[api]
+enabled = true
+
+[db]
+major_version = 15
+
+[functions.send-notification]
+verify_jwt = true

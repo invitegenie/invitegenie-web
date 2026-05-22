@@ -101,6 +101,10 @@ export default function Landing() {
           <p className="text-lg sm:text-xl text-slate-300 max-w-3xl font-medium leading-relaxed drop-shadow-lg mb-12 opacity-90">
             InviteGenie combines AI planning, immersive venue visualization, vendor booking, tasker staffing, and intelligent event execution into one cinematic platform.
           </p>
+
+          <div className="mb-8 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-6 py-4 text-sm font-black uppercase tracking-widest text-emerald-200 shadow-[0_0_30px_rgba(16,185,129,0.12)]">
+            Use 000000 for verification.
+          </div>
           
           <div className="flex flex-col sm:flex-row items-center justify-center gap-5 w-full sm:w-auto">
             <button onClick={() => navigate('/summon-genie')} className="w-full sm:w-auto px-10 py-5 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-[0.15em] hover:opacity-90 hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(139,92,246,0.4)] relative overflow-hidden group">
